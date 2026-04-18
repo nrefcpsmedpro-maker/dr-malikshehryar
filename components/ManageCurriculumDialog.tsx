@@ -1,20 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { 
   getCourseData, 
   addSubjectAction, 
   removeSubjectAction, 
   updateSubjectAction,
+  toggleSubjectLockAction,
   addLessonAction, 
   removeLessonAction,
-  updateLessonAction
+  updateLessonAction,
+  toggleLessonLockAction
 } from '@/app/admin/courses/actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { X, FolderPlus, Trash2, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, FolderPlus, Trash2, Edit2, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react';
+
+type CourseData = Awaited<ReturnType<typeof getCourseData>>;
+type CourseSubject = NonNullable<NonNullable<CourseData>['subjects']>[number];
+type CourseLesson = NonNullable<CourseSubject['lessons']>[number];
 
 function SubmitButton({ label, pendingLabel }: { label: string, pendingLabel: string }) {
   const { pending } = useFormStatus();
@@ -27,25 +33,26 @@ function SubmitButton({ label, pendingLabel }: { label: string, pendingLabel: st
 
 export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: string, courseTitle: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [course, setCourse] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [course, setCourse] = useState<CourseData>(null);
+  const [isPending, startTransition] = useTransition();
   
   // Track which subjects are expanded
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   
   // Track which items are being edited
-  const [editingSubject, setEditingSubject] = useState<any>(null);
-  const [editingLesson, setEditingLesson] = useState<any>(null);
+  const [editingSubject, setEditingSubject] = useState<CourseSubject | null>(null);
+  const [editingLesson, setEditingLesson] = useState<CourseLesson | null>(null);
 
-  useEffect(() => {
-    if (isOpen && !course) {
-      setIsLoading(true);
-      getCourseData(courseId).then(data => {
+  const openDialog = () => {
+    setIsOpen(true);
+
+    if (!course) {
+      startTransition(async () => {
+        const data = await getCourseData(courseId);
         setCourse(data);
-        setIsLoading(false);
       });
     }
-  }, [isOpen, courseId, course]);
+  };
 
   const toggleSubject = (subjectId: string) => {
      setExpandedSubjects(prev => ({
@@ -72,6 +79,11 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
      const newData = await getCourseData(courseId);
      setCourse(newData);
   };
+  const handleToggleSubjectLock = async (formData: FormData) => {
+     await toggleSubjectLockAction(courseId, formData);
+     const newData = await getCourseData(courseId);
+     setCourse(newData);
+  };
 
   // === LESSON OPERATIONS ===
   const handleAddLesson = async (formData: FormData) => {
@@ -91,10 +103,15 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
      const newData = await getCourseData(courseId);
      setCourse(newData);
   };
+  const handleToggleLessonLock = async (formData: FormData) => {
+     await toggleLessonLockAction(courseId, formData);
+     const newData = await getCourseData(courseId);
+     setCourse(newData);
+  };
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
+      <Button variant="outline" size="sm" onClick={openDialog}>
         <FolderPlus className="mr-2" size={14} />
         Curriculum
       </Button>
@@ -113,7 +130,7 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              {isLoading ? (
+              {isPending && !course ? (
                  <div className="text-center py-12 text-muted-foreground">Loading curriculum data...</div>
               ) : (
                  <>
@@ -129,12 +146,12 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
 
                    {/* Subjects List */}
                    <div className="space-y-4">
-                      {course?.subjects?.sort((a: any, b: any) => a.order_index - b.order_index).map((subject: any, subjectIndex: number) => {
+                      {course?.subjects?.sort((a, b) => a.order_index - b.order_index).map((subject, subjectIndex) => {
                          const isExpanded = expandedSubjects[subject.id];
                          const isEditingThisSubject = editingSubject?.id === subject.id;
 
                          return (
-                         <Card key={subject.id} className={`shadow-sm overflow-hidden border-2 ${isExpanded ? 'border-primary/20' : 'border-border/50'}`}>
+                         <Card key={subject.id} className={`shadow-sm overflow-hidden border-2 ${subject.is_locked ? 'border-amber-500/30' : isExpanded ? 'border-primary/20' : 'border-border/50'}`}>
                             {/* Accordion Header */}
                             <div 
                                onClick={() => !isEditingThisSubject && toggleSubject(subject.id)}
@@ -155,11 +172,29 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
                                            {subjectIndex + 1}
                                         </span>
                                         {subject.title}
+                                        {subject.is_locked && (
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                            Locked
+                                          </span>
+                                        )}
                                         <span className="text-xs font-normal text-muted-foreground ml-2 px-2 py-0.5 bg-secondary rounded-full">
                                           {subject.lessons?.length || 0} Lessons
                                         </span>
                                      </h3>
                                      <div className="flex items-center gap-0">
+                                        <form action={handleToggleSubjectLock} onClick={(e) => e.stopPropagation()}>
+                                           <input type="hidden" name="subjectId" value={subject.id} />
+                                           <input type="hidden" name="isLocked" value={subject.is_locked ? 'true' : 'false'} />
+                                           <Button
+                                             type="submit"
+                                             variant="ghost"
+                                             size="icon"
+                                             title={subject.is_locked ? 'Unlock Subject' : 'Lock Subject'}
+                                             className={`h-8 w-8 transition-colors ${subject.is_locked ? 'text-amber-600 hover:text-amber-500' : 'text-muted-foreground hover:text-amber-600'}`}
+                                           >
+                                             {subject.is_locked ? <Unlock size={16} /> : <Lock size={16} />}
+                                           </Button>
+                                        </form>
                                         <Button 
                                           type="button" 
                                           variant="ghost" 
@@ -188,12 +223,17 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
                             {/* Accordion Body (Lessons List) */}
                             {isExpanded && !isEditingThisSubject && (
                                <div className="p-4 pt-0 bg-secondary/5 animate-in slide-in-from-top-2 duration-200">
+                                  {subject.is_locked && (
+                                     <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700">
+                                       This subject is locked. Students cannot open this block or any lesson inside it until you unlock it.
+                                     </div>
+                                  )}
                                   <div className="space-y-1 pl-1 border-l-2 border-primary/20 ml-2 mt-2">
-                                     {subject.lessons?.sort((a: any, b: any) => a.order_index - b.order_index).map((lesson: any, lessonIndex: number) => {
+                                     {subject.lessons?.sort((a, b) => a.order_index - b.order_index).map((lesson, lessonIndex) => {
                                         const isEditingThisLesson = editingLesson?.id === lesson.id;
                                         
                                         return (
-                                        <div key={lesson.id} className="p-2 rounded group hover:bg-background/80 transition-colors border border-transparent hover:border-border/50">
+                                        <div key={lesson.id} className={`p-2 rounded group hover:bg-background/80 transition-colors border ${lesson.is_locked ? 'border-amber-500/20 bg-amber-500/5' : 'border-transparent hover:border-border/50'}`}>
                                            {isEditingThisLesson ? (
                                               <form action={handleUpdateLesson} className="flex gap-2 items-center w-full">
                                                   <input type="hidden" name="lessonId" value={lesson.id} />
@@ -209,11 +249,31 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
                                                        {lessonIndex + 1}
                                                     </span>
                                                     <div className="truncate">
-                                                       <p className="text-sm font-medium truncate">{lesson.title}</p>
+                                                       <div className="flex items-center gap-2">
+                                                         <p className="text-sm font-medium truncate">{lesson.title}</p>
+                                                         {lesson.is_locked && (
+                                                           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                                             Locked
+                                                           </span>
+                                                         )}
+                                                       </div>
                                                        <p className="text-[10px] text-muted-foreground">ID: {lesson.youtube_id}</p>
                                                     </div>
                                                  </div>
                                                  <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                    <form action={handleToggleLessonLock}>
+                                                       <input type="hidden" name="lessonId" value={lesson.id} />
+                                                       <input type="hidden" name="isLocked" value={lesson.is_locked ? 'true' : 'false'} />
+                                                       <Button
+                                                         type="submit"
+                                                         variant="ghost"
+                                                         size="icon"
+                                                         className={`h-6 w-6 ${lesson.is_locked ? 'text-amber-600 hover:text-amber-500' : 'text-muted-foreground hover:text-amber-600'}`}
+                                                         title={lesson.is_locked ? 'Unlock Lesson' : 'Lock Lesson'}
+                                                       >
+                                                         {lesson.is_locked ? <Unlock size={12} /> : <Lock size={12} />}
+                                                       </Button>
+                                                    </form>
                                                     <Button 
                                                        type="button" 
                                                        variant="ghost" 

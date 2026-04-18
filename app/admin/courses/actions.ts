@@ -5,6 +5,30 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
+async function getAdminSupabaseClient() {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'admin') {
+    throw new Error('Unauthorized');
+  }
+
+  return supabase;
+}
+
 // == INITIALIZATION ==
 export async function createCourseAction(formData: FormData) {
   const title = formData.get('title') as string;
@@ -60,8 +84,7 @@ export async function deleteCourseAction(formData: FormData) {
 
 // == FETCH CURRENT DATA ==
 export async function getCourseData(courseId: string) {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await getAdminSupabaseClient();
   
   const { data, error } = await supabase
     .from('courses')
@@ -84,6 +107,42 @@ export async function getCourseData(courseId: string) {
     return null;
   }
   return data;
+}
+
+export async function getManageStudentsData(courseId: string) {
+  const supabase = await getAdminSupabaseClient();
+
+  const [{ data: course, error: courseError }, { data: students, error: studentsError }] = await Promise.all([
+    supabase
+      .from('courses')
+      .select(`
+        id,
+        title,
+        enrollments (
+          id,
+          user_id,
+          created_at,
+          profiles(email, full_name, is_approved)
+        )
+      `)
+      .eq('id', courseId)
+      .single(),
+    supabase
+      .from('profiles')
+      .select('id, email, full_name, is_approved')
+      .eq('role', 'student')
+      .order('email', { ascending: true }),
+  ]);
+
+  if (courseError || studentsError) {
+    console.error(courseError || studentsError);
+    return null;
+  }
+
+  return {
+    course,
+    students: students ?? [],
+  };
 }
 
 // == CURRICULUM ==
@@ -162,22 +221,114 @@ export async function removeLessonAction(courseId: string, formData: FormData) {
 
 // == STUDENTS ==
 export async function enrollStudentAction(courseId: string, formData: FormData) {
-  const email = formData.get('email') as string;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const userId = formData.get('userId');
+
+  if (typeof userId !== 'string' || !userId) {
+    console.error('Student selection is required');
+    return;
+  }
+
+  const supabase = await getAdminSupabaseClient();
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
-    .eq('email', email)
-    .single();
+    .eq('id', userId)
+    .eq('role', 'student')
+    .maybeSingle();
 
   if (profile) {
-     await supabase.from('enrollments').insert([{ user_id: profile.id, course_id: courseId }]);
+     const { error } = await supabase
+       .from('enrollments')
+       .insert([{ user_id: profile.id, course_id: courseId }]);
+
+     if (error && error.code !== '23505') {
+       console.error('Error enrolling student', error);
+       return;
+     }
+
      revalidatePath(`/admin/courses`);
+     revalidatePath('/admin/users');
+     revalidatePath('/dashboard');
   } else {
-     console.error("Student not found");
+     console.error('Student not found');
   }
+}
+
+export async function unenrollStudentAction(courseId: string, formData: FormData) {
+  const enrollmentId = formData.get('enrollmentId');
+
+  if (typeof enrollmentId !== 'string' || !enrollmentId) {
+    console.error('Enrollment selection is required');
+    return;
+  }
+
+  const supabase = await getAdminSupabaseClient();
+  const { error } = await supabase
+    .from('enrollments')
+    .delete()
+    .eq('id', enrollmentId)
+    .eq('course_id', courseId);
+
+  if (error) {
+    console.error('Error removing enrollment', error);
+    return;
+  }
+
+  revalidatePath('/admin/courses');
+  revalidatePath('/admin/users');
+  revalidatePath('/dashboard');
+}
+
+export async function toggleSubjectLockAction(courseId: string, formData: FormData) {
+  const subjectId = formData.get('subjectId');
+  const isLocked = formData.get('isLocked') === 'true';
+
+  if (typeof subjectId !== 'string' || !subjectId) {
+    console.error('Subject selection is required');
+    return;
+  }
+
+  const supabase = await getAdminSupabaseClient();
+  const { error } = await supabase
+    .from('subjects')
+    .update({ is_locked: !isLocked })
+    .eq('id', subjectId)
+    .eq('course_id', courseId);
+
+  if (error) {
+    console.error('Error toggling subject lock', error);
+    return;
+  }
+
+  revalidatePath('/admin/courses');
+  revalidatePath(`/dashboard/courses/${courseId}`);
+}
+
+export async function toggleLessonLockAction(courseId: string, formData: FormData) {
+  const lessonId = formData.get('lessonId');
+  const isLocked = formData.get('isLocked') === 'true';
+
+  if (typeof lessonId !== 'string' || !lessonId) {
+    console.error('Lesson selection is required');
+    return;
+  }
+
+  const supabase = await getAdminSupabaseClient();
+  const { error } = await supabase
+    .from('lessons')
+    .update({ is_locked: !isLocked })
+    .eq('id', lessonId)
+    .eq('course_id', courseId);
+
+  if (error) {
+    console.error('Error toggling lesson lock', error);
+    return;
+  }
+
+  revalidatePath('/admin/courses');
+  revalidatePath(`/dashboard/courses/${courseId}`);
+  revalidatePath(`/courses/${courseId}/lessons/${lessonId}`);
 }
 
 // == TESTS ==
