@@ -75,7 +75,7 @@ export default async function AdminUsersPage() {
 
   (enrollments ?? []).forEach((enrollment) => {
     const userEnrollments = enrollmentsByUser.get(enrollment.user_id) ?? [];
-    userEnrollments.push(enrollment);
+    userEnrollments.push(enrollment as unknown as Enrollment);
     enrollmentsByUser.set(enrollment.user_id, userEnrollments);
   });
 
