@@ -43,7 +43,8 @@ export default async function LessonPage({
       .single(),
   ]);
 
-  const isLockedForStudent = profile?.role !== 'admin' && (lesson?.is_locked || lesson?.subjects?.is_locked);
+  const lessonData = lesson as LessonDetails | null;
+  const isLockedForStudent = profile?.role !== 'admin' && (lessonData?.is_locked || lessonData?.subjects?.is_locked);
 
   if (lessonError || !lesson || isLockedForStudent) {
     return (
@@ -59,7 +60,7 @@ export default async function LessonPage({
     );
   }
 
-  const lessonDetails = lesson as LessonDetails;
+  const lessonDetails = lessonData as LessonDetails;
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row animate-in fade-in duration-500">
