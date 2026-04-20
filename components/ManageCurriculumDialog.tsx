@@ -146,7 +146,7 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
 
                    {/* Subjects List */}
                    <div className="space-y-4">
-                      {course?.subjects?.sort((a, b) => a.order_index - b.order_index).map((subject, subjectIndex) => {
+                      {course?.subjects?.sort((a: CourseSubject, b: CourseSubject) => a.order_index - b.order_index).map((subject, subjectIndex) => {
                          const isExpanded = expandedSubjects[subject.id];
                          const isEditingThisSubject = editingSubject?.id === subject.id;
 
@@ -229,7 +229,7 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
                                      </div>
                                   )}
                                   <div className="space-y-1 pl-1 border-l-2 border-primary/20 ml-2 mt-2">
-                                     {subject.lessons?.sort((a, b) => a.order_index - b.order_index).map((lesson, lessonIndex) => {
+                                     {subject.lessons?.sort((a: CourseLesson, b: CourseLesson) => a.order_index - b.order_index).map((lesson, lessonIndex) => {
                                         const isEditingThisLesson = editingLesson?.id === lesson.id;
                                         
                                         return (
