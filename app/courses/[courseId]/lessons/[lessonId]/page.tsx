@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import VideoPlayer from '@/components/VideoPlayer';
+import PageSecurityShield from '@/components/PageSecurityShield';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createVideoPlaybackToken, hashUserAgent } from '@/utils/videoTokens';
@@ -77,6 +78,7 @@ export default async function LessonPage({
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row animate-in fade-in duration-500">
+      <PageSecurityShield />
       <main className="flex-1 p-6 md:p-8 flex flex-col gap-6 w-full max-w-5xl mx-auto">
         <div>
           <Link href={`/dashboard/courses/${courseId}`} className="text-sm text-primary hover:text-primary/80 font-medium mb-2 inline-block">
