@@ -33,6 +33,7 @@ export default function PageSecurityShield() {
     setDevToolsOpen(false);
   }, []);
 
+  useEffect(() => {
     // ═══════════════════════════════════════════
     // 1. RIGHT-CLICK BLOCKING (Extension-Resistant)
     // ═══════════════════════════════════════════
