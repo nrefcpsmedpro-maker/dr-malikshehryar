@@ -245,7 +245,7 @@ export default function PageSecurityShield() {
         }
       }
       /* Prevent image dragging */
-      img, video, iframe, canvas {
+      img, video, canvas {
         -webkit-user-drag: none !important;
         user-drag: none !important;
         pointer-events: none !important;
