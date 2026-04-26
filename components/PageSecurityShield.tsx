@@ -19,33 +19,9 @@ export default function PageSecurityShield() {
   const [devToolsOpen, setDevToolsOpen] = useState(false);
   const devToolsCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Cache native prototypes BEFORE extensions can override them ──
-  const nativesRef = useRef({
-    preventDefault: Event.prototype.preventDefault,
-    stopImmediatePropagation: Event.prototype.stopImmediatePropagation,
-    stopPropagation: Event.prototype.stopPropagation,
-    addEventListener: EventTarget.prototype.addEventListener,
-    removeEventListener: EventTarget.prototype.removeEventListener,
-  });
-
   // ── DevTools Detection ──
   const checkDevTools = useCallback(() => {
-    // Method 1: debugger timing — if DevTools is open, the debugger pause
-    // causes measurable delay (>100ms instead of <2ms)
-    const threshold = 160;
-    const before = performance.now();
-
-    // This debugger statement pauses execution when DevTools is open
-    // eslint-disable-next-line no-debugger
-    debugger;
-
-    const after = performance.now();
-    if (after - before > threshold) {
-      setDevToolsOpen(true);
-      return;
-    }
-
-    // Method 2: outer vs inner window size difference
+    // Method: outer vs inner window size difference
     // DevTools docked to the side/bottom creates a size discrepancy
     const widthDiff = window.outerWidth - window.innerWidth;
     const heightDiff = window.outerHeight - window.innerHeight;
@@ -57,17 +33,14 @@ export default function PageSecurityShield() {
     setDevToolsOpen(false);
   }, []);
 
-  useEffect(() => {
-    const natives = nativesRef.current;
-
     // ═══════════════════════════════════════════
     // 1. RIGHT-CLICK BLOCKING (Extension-Resistant)
     // ═══════════════════════════════════════════
 
     const blockContextMenu = (e: Event) => {
-      natives.preventDefault.call(e);
-      natives.stopImmediatePropagation.call(e);
-      natives.stopPropagation.call(e);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
       return false;
     };
 
@@ -98,64 +71,64 @@ export default function PageSecurityShield() {
 
       // DevTools shortcuts
       if (e.key === 'F12') {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Element picker)
       if (ctrl && shift && ['i', 'j', 'c'].includes(key)) {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Ctrl+U (View Source)
       if (ctrl && !shift && key === 'u') {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Ctrl+S (Save Page)
       if (ctrl && !shift && key === 's') {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Ctrl+P (Print)
       if (ctrl && !shift && key === 'p') {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Ctrl+A (Select All)
       if (ctrl && !shift && key === 'a') {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Ctrl+C (Copy), Ctrl+X (Cut)
       if (ctrl && !shift && (key === 'c' || key === 'x')) {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Mac: Cmd+Alt+I (Inspect), Cmd+Alt+J (Console), Cmd+Alt+C (Element picker)
       if (e.metaKey && alt && ['i', 'j', 'c'].includes(key)) {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
       // Mac: Cmd+Alt+U (View Source)
       if (e.metaKey && alt && key === 'u') {
-        natives.preventDefault.call(e);
-        natives.stopImmediatePropagation.call(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return false;
       }
 
@@ -173,27 +146,13 @@ export default function PageSecurityShield() {
     // Check every 2 seconds
     devToolsCheckIntervalRef.current = setInterval(checkDevTools, 2000);
 
-    // Also detect via console.log image trick
-    const detectViaConsole = () => {
-      const element = new Image();
-      Object.defineProperty(element, 'id', {
-        get: function () {
-          setDevToolsOpen(true);
-        },
-      });
-      // If DevTools console is open, accessing the element triggers the getter
-      console.log('%c', element as unknown as string);
-    };
-
-    const consoleCheckInterval = setInterval(detectViaConsole, 3000);
-
     // ═══════════════════════════════════════════
     // 4. COPY / CUT / PASTE / DRAG / SELECT BLOCKING
     // ═══════════════════════════════════════════
 
     const blockCopy = (e: Event) => {
-      natives.preventDefault.call(e);
-      natives.stopImmediatePropagation.call(e);
+      e.preventDefault();
+      e.stopImmediatePropagation();
     };
 
     document.addEventListener('copy', blockCopy, true);
@@ -251,43 +210,7 @@ export default function PageSecurityShield() {
       subtree: true,
     });
 
-    // ═══════════════════════════════════════════
-    // 6. PROTECT AGAINST addEventListener OVERRIDE
-    // ═══════════════════════════════════════════
-    // Some extensions override addEventListener to filter out
-    // contextmenu handlers. We monitor and restore.
 
-    const protectAddEventListener = () => {
-      if (EventTarget.prototype.addEventListener !== natives.addEventListener) {
-        // Extension has overridden addEventListener — restore it
-        try {
-          Object.defineProperty(EventTarget.prototype, 'addEventListener', {
-            value: natives.addEventListener,
-            writable: false,
-            configurable: true,
-          });
-        } catch {
-          // If defineProperty fails, the extension has locked it
-        }
-        // Re-attach our handlers with the restored method
-        attachContextMenuBlocker();
-      }
-
-      // Also check if preventDefault was overridden
-      if (Event.prototype.preventDefault !== natives.preventDefault) {
-        try {
-          Object.defineProperty(Event.prototype, 'preventDefault', {
-            value: natives.preventDefault,
-            writable: false,
-            configurable: true,
-          });
-        } catch {
-          // Extension locked it
-        }
-      }
-    };
-
-    const prototypeCheckInterval = setInterval(protectAddEventListener, 500);
 
     // ═══════════════════════════════════════════
     // 7. CSS PROTECTIONS (injected via JS to avoid stylesheet stripping)
@@ -342,9 +265,7 @@ export default function PageSecurityShield() {
 
     return () => {
       clearInterval(contextMenuInterval);
-      clearInterval(prototypeCheckInterval);
       clearInterval(styleCheckInterval);
-      clearInterval(consoleCheckInterval);
       if (devToolsCheckIntervalRef.current) {
         clearInterval(devToolsCheckIntervalRef.current);
       }
