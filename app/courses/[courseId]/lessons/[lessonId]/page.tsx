@@ -2,8 +2,9 @@ import { createClient } from '@/utils/supabase/server';
 import VideoPlayer from '@/components/VideoPlayer';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { createVideoPlaybackToken, hashUserAgent } from '@/utils/videoTokens';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 type LessonDetails = {
   title: string;
@@ -20,6 +21,7 @@ export default async function LessonPage({
 }) {
   const { courseId, lessonId } = await params;
   const cookieStore = await cookies();
+  const headerStore = await headers();
   const supabase = createClient(cookieStore);
   const {
     data: { user },
@@ -61,6 +63,17 @@ export default async function LessonPage({
   }
 
   const lessonDetails = lessonData as LessonDetails;
+  const userAgentHash = hashUserAgent(headerStore.get('user-agent'));
+  const playbackToken = createVideoPlaybackToken(
+    {
+      userId: user.id,
+      courseId,
+      lessonId,
+      youtubeId: lessonDetails.youtube_id,
+      userAgentHash,
+    },
+    120,
+  );
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row animate-in fade-in duration-500">
@@ -75,7 +88,7 @@ export default async function LessonPage({
           <h1 className="text-3xl font-bold tracking-tight">{lessonDetails.title}</h1>
         </div>
 
-        <VideoPlayer youtubeId={lessonDetails.youtube_id} />
+        <VideoPlayer playbackToken={playbackToken} />
 
         <div className="glass-card p-6 mt-4">
           <h3 className="text-xl font-medium mb-2">About this lesson</h3>

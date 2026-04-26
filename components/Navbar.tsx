@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { BookOpen, LayoutDashboard, LogOut, Settings, Video, Users, FileText } from 'lucide-react';
+import { BookOpen, LayoutDashboard, LogOut, Settings, Video, Users, FileText, Award } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -61,25 +61,39 @@ export default function Navbar({ role }: { role?: string }) {
               <Users size={18} />
               Manage Users
             </Link>
-             <Link 
-              href="/admin/tests" 
-              className={`flex items-center gap-2 text-sm font-medium transition-colors ${pathname.includes('/admin/tests') ? 'text-purple-400' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <FileText size={18} />
-              Manage Tests
-            </Link>
+<Link
+          href="/admin/tests"
+          className={`flex items-center gap-2 text-sm font-medium transition-colors ${pathname.includes('/admin/tests') ? 'text-purple-400' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <FileText size={18} />
+          Course Tests
+        </Link>
+        <Link
+          href="/admin/exams"
+          className={`flex items-center gap-2 text-sm font-medium transition-colors ${pathname.includes('/admin/exams') ? 'text-purple-400' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Award size={18} />
+          Mock Exams
+        </Link>
           </div>
         )}
         
         {role === 'student' && (
           <div className="hidden md:flex gap-4">
-             <Link 
-              href="/dashboard" 
-              className={`flex items-center gap-2 text-sm font-medium transition-colors ${pathname === '/dashboard' ? 'text-blue-400' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <LayoutDashboard size={18} />
-              My Courses
-            </Link>
+<Link
+          href="/dashboard"
+          className={`flex items-center gap-2 text-sm font-medium transition-colors ${pathname === '/dashboard' ? 'text-blue-400' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <LayoutDashboard size={18} />
+          My Courses
+        </Link>
+        <Link
+          href="/dashboard/exams"
+          className={`flex items-center gap-2 text-sm font-medium transition-colors ${pathname.includes('/dashboard/exams') ? 'text-blue-400' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Award size={18} />
+          Mock Exams
+        </Link>
           </div>
         )}
       </div>

@@ -26,8 +26,7 @@ on public.subjects
 for select
 to authenticated
 using (
-  not coalesce(is_locked, false)
-  and exists (
+  exists (
     select 1
     from public.enrollments
     where user_id = (select auth.uid())
@@ -63,18 +62,11 @@ on public.lessons
 for select
 to authenticated
 using (
-  not coalesce(lessons.is_locked, false)
-  and exists (
+  exists (
     select 1
     from public.enrollments
     where user_id = (select auth.uid())
       and course_id = lessons.course_id
-  )
-  and exists (
-    select 1
-    from public.subjects
-    where subjects.id = lessons.subject_id
-      and not coalesce(subjects.is_locked, false)
   )
 );
 

@@ -94,7 +94,15 @@
     @apply bg-background/60 backdrop-blur-lg border border-border;
   }
   
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-border rounded-xl shadow-lg;
-  }
+.glass-card {
+  @apply bg-card/80 backdrop-blur-xl border border-border rounded-xl shadow-lg;
+}
+
+#yt-player-host iframe {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
 }
