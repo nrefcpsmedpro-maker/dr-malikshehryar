@@ -56,6 +56,27 @@ export default function PageSecurityShield() {
       // Ignore if iframe block fails
     }
 
+    // ── The "Poison Pill" Defense against Extensions ──
+    // Extensions often use `e.stopPropagation()` in the capture phase to prevent
+    // our security scripts from receiving the contextmenu event.
+    // By hooking into stopPropagation, if the extension tries to silence the event,
+    // we secretly call preventDefault() from within their own call, killing the menu!
+    const originalStopPropagation = Event.prototype.stopPropagation;
+    Event.prototype.stopPropagation = function () {
+      if (this.type === 'contextmenu' || ((this.type === 'mousedown' || this.type === 'pointerdown') && (this as MouseEvent).button === 2)) {
+        pristinePreventDefault.call(this);
+      }
+      originalStopPropagation.call(this);
+    };
+
+    const originalStopImmediatePropagation = Event.prototype.stopImmediatePropagation;
+    Event.prototype.stopImmediatePropagation = function () {
+      if (this.type === 'contextmenu' || ((this.type === 'mousedown' || this.type === 'pointerdown') && (this as MouseEvent).button === 2)) {
+        pristinePreventDefault.call(this);
+      }
+      originalStopImmediatePropagation.call(this);
+    };
+
     // ═══════════════════════════════════════════
     // 1. RIGHT-CLICK BLOCKING (Extension-Resistant)
     // ═══════════════════════════════════════════
@@ -73,6 +94,21 @@ export default function PageSecurityShield() {
     const attachContextMenuBlocker = () => {
       window.removeEventListener('contextmenu', blockContextMenu, true);
       window.addEventListener('contextmenu', blockContextMenu, true);
+
+      // Also attack the mousedown and pointerdown events (button 2 is right click)
+      const blockMouse = (e: Event) => {
+        if ((e as MouseEvent).button === 2 || (e as MouseEvent).button === 3) {
+          pristinePreventDefault.call(e);
+          pristineStopImmediate.call(e);
+        }
+      };
+
+      window.removeEventListener('mousedown', blockMouse, true);
+      window.addEventListener('mousedown', blockMouse, true);
+      window.removeEventListener('pointerdown', blockMouse, true);
+      window.addEventListener('pointerdown', blockMouse, true);
+      window.removeEventListener('mouseup', blockMouse, true);
+      window.addEventListener('mouseup', blockMouse, true);
 
       // Also set inline handler as fallback
       document.body.setAttribute('oncontextmenu', 'return false;');
@@ -303,6 +339,10 @@ export default function PageSecurityShield() {
       mutationObserver.disconnect();
 
       styleEl.remove();
+
+      // Restore prototypes
+      Event.prototype.stopPropagation = originalStopPropagation;
+      Event.prototype.stopImmediatePropagation = originalStopImmediatePropagation;
     };
   }, [checkDevTools]);
 
