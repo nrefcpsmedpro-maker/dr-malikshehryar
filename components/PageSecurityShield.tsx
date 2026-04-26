@@ -34,21 +34,45 @@ export default function PageSecurityShield() {
   }, []);
 
   useEffect(() => {
+    // ── Bypass Extension Hooks using a Hidden Iframe ──
+    // Extensions run before our script and override Event prototypes to prevent us
+    // from calling preventDefault. We can get pristine, un-mocked native functions
+    // from a fresh, hidden iframe.
+    let pristinePreventDefault = Event.prototype.preventDefault;
+    let pristineStopImmediate = Event.prototype.stopImmediatePropagation;
+    let pristineStop = Event.prototype.stopPropagation;
+
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      if (iframe.contentWindow) {
+        pristinePreventDefault = iframe.contentWindow.Event.prototype.preventDefault;
+        pristineStopImmediate = iframe.contentWindow.Event.prototype.stopImmediatePropagation;
+        pristineStop = iframe.contentWindow.Event.prototype.stopPropagation;
+      }
+      document.body.removeChild(iframe);
+    } catch (e) {
+      // Ignore if iframe block fails
+    }
+
     // ═══════════════════════════════════════════
     // 1. RIGHT-CLICK BLOCKING (Extension-Resistant)
     // ═══════════════════════════════════════════
 
     const blockContextMenu = (e: Event) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
+      // Use the pristine native functions to guarantee the event is killed,
+      // even if the extension mocked the top-level Event.prototype
+      pristinePreventDefault.call(e);
+      pristineStopImmediate.call(e);
+      pristineStop.call(e);
       return false;
     };
 
-    // Attach in capture phase — runs before any extension's bubbling handlers
+    // Attach in capture phase to WINDOW — runs before document-level extension handlers
     const attachContextMenuBlocker = () => {
-      document.removeEventListener('contextmenu', blockContextMenu, true);
-      document.addEventListener('contextmenu', blockContextMenu, true);
+      window.removeEventListener('contextmenu', blockContextMenu, true);
+      window.addEventListener('contextmenu', blockContextMenu, true);
 
       // Also set inline handler as fallback
       document.body.setAttribute('oncontextmenu', 'return false;');
@@ -72,73 +96,70 @@ export default function PageSecurityShield() {
 
       // DevTools shortcuts
       if (e.key === 'F12') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Element picker)
       if (ctrl && shift && ['i', 'j', 'c'].includes(key)) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Ctrl+U (View Source)
       if (ctrl && !shift && key === 'u') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Ctrl+S (Save Page)
       if (ctrl && !shift && key === 's') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Ctrl+P (Print)
       if (ctrl && !shift && key === 'p') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Ctrl+A (Select All)
       if (ctrl && !shift && key === 'a') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Ctrl+C (Copy), Ctrl+X (Cut)
       if (ctrl && !shift && (key === 'c' || key === 'x')) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Mac: Cmd+Alt+I (Inspect), Cmd+Alt+J (Console), Cmd+Alt+C (Element picker)
       if (e.metaKey && alt && ['i', 'j', 'c'].includes(key)) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
 
       // Mac: Cmd+Alt+U (View Source)
       if (e.metaKey && alt && key === 'u') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        pristinePreventDefault.call(e);
+        pristineStopImmediate.call(e);
         return false;
       }
-
-      // F5 / Ctrl+R (allow refresh — don't block, but you could if needed)
     };
 
-    document.addEventListener('keydown', blockShortcuts, true);
-    // Also block keyup to prevent extensions that listen on keyup
-    document.addEventListener('keyup', blockShortcuts, true);
+    window.addEventListener('keydown', blockShortcuts, true);
+    window.addEventListener('keyup', blockShortcuts, true);
 
     // ═══════════════════════════════════════════
     // 3. DEVTOOLS OPEN DETECTION
@@ -152,15 +173,15 @@ export default function PageSecurityShield() {
     // ═══════════════════════════════════════════
 
     const blockCopy = (e: Event) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
+      pristinePreventDefault.call(e);
+      pristineStopImmediate.call(e);
     };
 
-    document.addEventListener('copy', blockCopy, true);
-    document.addEventListener('cut', blockCopy, true);
-    document.addEventListener('dragstart', blockCopy, true);
-    document.addEventListener('selectstart', blockCopy, true);
-    document.addEventListener('beforeprint', blockCopy, true);
+    window.addEventListener('copy', blockCopy, true);
+    window.addEventListener('cut', blockCopy, true);
+    window.addEventListener('dragstart', blockCopy, true);
+    window.addEventListener('selectstart', blockCopy, true);
+    window.addEventListener('beforeprint', blockCopy, true);
 
     // ═══════════════════════════════════════════
     // 5. DOM MUTATION MONITORING
@@ -271,14 +292,14 @@ export default function PageSecurityShield() {
         clearInterval(devToolsCheckIntervalRef.current);
       }
 
-      document.removeEventListener('contextmenu', blockContextMenu, true);
-      document.removeEventListener('keydown', blockShortcuts, true);
-      document.removeEventListener('keyup', blockShortcuts, true);
-      document.removeEventListener('copy', blockCopy, true);
-      document.removeEventListener('cut', blockCopy, true);
-      document.removeEventListener('dragstart', blockCopy, true);
-      document.removeEventListener('selectstart', blockCopy, true);
-      document.removeEventListener('beforeprint', blockCopy, true);
+      window.removeEventListener('contextmenu', blockContextMenu, true);
+      window.removeEventListener('keydown', blockShortcuts, true);
+      window.removeEventListener('keyup', blockShortcuts, true);
+      window.removeEventListener('copy', blockCopy, true);
+      window.removeEventListener('cut', blockCopy, true);
+      window.removeEventListener('dragstart', blockCopy, true);
+      window.removeEventListener('selectstart', blockCopy, true);
+      window.removeEventListener('beforeprint', blockCopy, true);
       mutationObserver.disconnect();
 
       styleEl.remove();
