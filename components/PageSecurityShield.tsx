@@ -171,13 +171,13 @@ export default function PageSecurityShield() {
       for (const mutation of mutations) {
         if (mutation.type === 'attributes') {
           const target = mutation.target as HTMLElement;
-          if (mutation.attributeName === 'oncontextmenu') {
+          if (mutation.attributeName === 'oncontextmenu' && target.getAttribute('oncontextmenu') !== 'return false;') {
             target.setAttribute('oncontextmenu', 'return false;');
           }
-          if (mutation.attributeName === 'oncopy') {
+          if (mutation.attributeName === 'oncopy' && target.getAttribute('oncopy') !== 'return false;') {
             target.setAttribute('oncopy', 'return false;');
           }
-          if (mutation.attributeName === 'onselectstart') {
+          if (mutation.attributeName === 'onselectstart' && target.getAttribute('onselectstart') !== 'return false;') {
             target.setAttribute('onselectstart', 'return false;');
           }
         }
