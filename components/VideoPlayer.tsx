@@ -113,8 +113,8 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerHostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<InstanceType<NonNullable<typeof window.YT>['Player']> | null>(null);
-  const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const progressUpdateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hideControlsTimerRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
+  const progressUpdateTimerRef = useRef<number | ReturnType<typeof setInterval> | null>(null);
 
   const [videoId, setVideoId] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
