@@ -418,7 +418,7 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
       } else if (document.pictureInPictureEnabled) {
         const videoElement = playerHostRef.current.querySelector('iframe');
         if (videoElement) {
-          await videoElement.requestPictureInPicture();
+          await (videoElement as any).requestPictureInPicture();
         }
       }
     } catch {
