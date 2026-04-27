@@ -47,9 +47,9 @@ export default function PageSecurityShield() {
       iframe.style.display = 'none';
       document.body.appendChild(iframe);
       if (iframe.contentWindow) {
-        pristinePreventDefault = iframe.contentWindow.Event.prototype.preventDefault;
-        pristineStopImmediate = iframe.contentWindow.Event.prototype.stopImmediatePropagation;
-        pristineStop = iframe.contentWindow.Event.prototype.stopPropagation;
+        pristinePreventDefault = (iframe.contentWindow as any).Event.prototype.preventDefault;
+        pristineStopImmediate = (iframe.contentWindow as any).Event.prototype.stopImmediatePropagation;
+        pristineStop = (iframe.contentWindow as any).Event.prototype.stopPropagation;
       }
       document.body.removeChild(iframe);
     } catch (e) {
