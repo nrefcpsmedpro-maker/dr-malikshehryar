@@ -83,7 +83,7 @@ export async function GET(request: Request) {
     return jsonError('Lesson not found', 404);
   }
 
-  const lessonData = lesson as LessonAccess;
+  const lessonData = lesson as unknown as LessonAccess;
 
   if (lessonData.course_id !== payload.courseId || lessonData.youtube_id !== payload.youtubeId) {
     return jsonError('Token does not match lesson', 401);
