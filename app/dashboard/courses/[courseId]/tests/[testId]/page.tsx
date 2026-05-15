@@ -1,8 +1,13 @@
-import { createClient } from '@/utils/supabase/server';
+import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
+import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { createClient } from '@/utils/supabase/server';
 import TestEngine from '@/components/TestEngine';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import type { MockResult, MockTestWithQuestions } from '@/types/lms';
+import { percentage } from '@/utils/lms';
 
 export default async function StudentTestPage({
   params,
@@ -12,65 +17,75 @@ export default async function StudentTestPage({
   const { courseId, testId } = await params;
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) redirect('/login');
 
-  // Fetch test details
-  const { data: test, error } = await supabase
+  const { data: testData, error } = await supabase
     .from('mock_tests')
-    .select(`*, questions:mock_questions(*)`)
+    .select('id, course_id, title, description, time_limit_minutes, created_at, questions:mock_questions(*)')
     .eq('id', testId)
     .single();
 
-  if (error || !test) redirect(`/dashboard/courses/${courseId}`);
+  if (error || !testData) redirect(`/dashboard/courses/${courseId}`);
 
-  // Did the user already take this test?
-  const { data: result } = await supabase
+  const test = testData as unknown as MockTestWithQuestions;
+
+  const { data: resultData } = await supabase
     .from('mock_results')
     .select('*')
     .eq('test_id', testId)
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (result) {
-     const percentage = Math.round((result.score / result.total_questions) * 100);
-     const isPassing = percentage >= 60;
-     
-     return (
-        <div className="min-h-[70vh] flex flex-col items-center justify-center p-4">
-           <div className={`glass-card max-w-lg w-full p-12 rounded-2xl text-center border-t-4 ${isPassing ? 'border-t-emerald-500' : 'border-t-destructive'}`}>
-              <h2 className="text-2xl font-bold mb-2">Test Completed</h2>
-              <p className="text-muted-foreground mb-8">{test.title}</p>
-              
-              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center border-4 mb-6 ${isPassing ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-destructive/30 bg-destructive/10'}`}>
-                 <div>
-                    <span className={`text-4xl font-bold ${isPassing ? 'text-emerald-400' : 'text-destructive'}`}>
-                       {percentage}%
-                    </span>
-                 </div>
-              </div>
-              
-              <div className="flex justify-center gap-6 mb-8 text-sm font-medium">
-                 <div className="flex flex-col">
-                    <span className="text-muted-foreground uppercase text-xs tracking-wider">Score</span>
-                    <span className="text-lg">{result.score} / {result.total_questions}</span>
-                 </div>
-                 <div className="w-px bg-white/10" />
-                 <div className="flex flex-col">
-                    <span className="text-muted-foreground uppercase text-xs tracking-wider">Status</span>
-                    <span className={`text-lg ${isPassing ? 'text-emerald-400' : 'text-destructive'}`}>{isPassing ? 'PASSED' : 'FAILED'}</span>
-                 </div>
-              </div>
+  const result = resultData as MockResult | null;
 
-              <Link href={`/dashboard/courses/${courseId}`} className="inline-block px-6 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg font-medium transition-colors">
-                 Back to Course
+  if (result) {
+    const scorePercent = percentage(result.score, result.total_questions);
+    const passing = scorePercent >= 60;
+
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center">
+        <Card className="w-full rounded-lg p-8 text-center shadow-sm">
+          <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-lg ${passing ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-destructive/10 text-destructive'}`}>
+            {passing ? <CheckCircle2 size={34} /> : <XCircle size={34} />}
+          </div>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight">{passing ? 'Test passed' : 'Test completed'}</h1>
+          <p className="mt-2 text-muted-foreground">{test.title}</p>
+
+          <div className="mx-auto mt-8 flex h-36 w-36 items-center justify-center rounded-full border-8 border-secondary bg-background">
+            <span className={`text-4xl font-semibold ${passing ? 'text-emerald-600 dark:text-emerald-300' : 'text-destructive'}`}>
+              {scorePercent}%
+            </span>
+          </div>
+
+          <div className="mt-8 grid grid-cols-2 gap-4 text-left">
+            <div className="rounded-lg border bg-background p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Score</p>
+              <p className="mt-2 text-xl font-semibold">{result.score} / {result.total_questions}</p>
+            </div>
+            <div className="rounded-lg border bg-background p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Status</p>
+              <p className={`mt-2 text-xl font-semibold ${passing ? 'text-emerald-600 dark:text-emerald-300' : 'text-destructive'}`}>
+                {passing ? 'Passed' : 'Needs review'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button asChild variant="secondary">
+              <Link href={`/dashboard/courses/${courseId}`}>
+                <ArrowLeft size={17} className="mr-2" />
+                Back to course
               </Link>
-           </div>
-        </div>
-     );
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
-  // If not taken, render the Test Engine
   return <TestEngine test={test} courseId={courseId} />;
 }

@@ -1,111 +1,159 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, CheckCircle2, Clock3, Circle, Send } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ProgressBar } from '@/components/lms/ProgressBar';
+import { StatusBadge } from '@/components/lms/StatusBadge';
+import type { MockQuestion, MockTestWithQuestions } from '@/types/lms';
+import { cn } from '@/utils/cn';
+import { percentage } from '@/utils/lms';
 
-export default function TestEngine({ 
-  test, 
-  courseId 
-}: { 
-  test: any, 
-  courseId: string 
+type OptionKey = 'A' | 'B' | 'C' | 'D';
+
+const options: OptionKey[] = ['A', 'B', 'C', 'D'];
+
+function optionText(question: MockQuestion, option: OptionKey) {
+  return question[`option_${option.toLowerCase()}` as keyof Pick<MockQuestion, 'option_a' | 'option_b' | 'option_c' | 'option_d'>];
+}
+
+export default function TestEngine({
+  test,
+  courseId,
+}: {
+  test: MockTestWithQuestions;
+  courseId: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const questions = useMemo(
+    () => [...(test.questions ?? [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [test.questions],
+  );
+  const [answers, setAnswers] = useState<Record<string, OptionKey>>({});
   const [timeLeft, setTimeLeft] = useState(test.time_limit_minutes * 60);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      handleSubmit();
-      return;
-    }
-    const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  const handleSelect = (questionId: string, option: string) => {
-    setAnswers(prev => ({ ...prev, [questionId]: option }));
+  const handleSelect = (questionId: string, option: OptionKey) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: option }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
+    if (submitting) return;
     setSubmitting(true);
-    let score = 0;
 
-    test.questions.forEach((q: any) => {
-      if (answers[q.id] === q.correct_option) {
-        score++;
-      }
-    });
-
-    const { data: { user } } = await supabase.auth.getUser();
+    const score = questions.reduce((sum, question) => (answers[question.id] === question.correct_option ? sum + 1 : sum), 0);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (user) {
-      await supabase.from('mock_results').insert([{
-        user_id: user.id,
-        test_id: test.id,
-        score,
-        total_questions: test.questions.length
-      }]);
+      await supabase.from('mock_results').insert([
+        {
+          user_id: user.id,
+          test_id: test.id,
+          score,
+          total_questions: questions.length,
+        },
+      ]);
     }
 
-    router.refresh(); // Refreshing server component should now pick up the result and show score
-  };
+    router.refresh();
+  }, [answers, questions, router, submitting, supabase, test.id]);
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      const timeout = window.setTimeout(() => {
+        void handleSubmit();
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
+
+    const timer = window.setInterval(() => setTimeLeft((value) => value - 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [handleSubmit, timeLeft]);
 
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return `${minutes}:${remainder.toString().padStart(2, '0')}`;
   };
 
+  const answeredCount = Object.keys(answers).length;
+  const completion = percentage(answeredCount, questions.length);
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between sticky top-4 z-10 glass-card p-4 rounded-xl border-blue-500/30">
-         <div>
-            <h2 className="text-xl font-bold">{test.title}</h2>
-            <p className="text-sm text-muted-foreground">{test.questions.length} Questions</p>
-         </div>
-         <div className={`text-2xl font-mono p-3 rounded-lg border ${timeLeft < 60 ? 'bg-destructive/20 text-destructive border-destructive/30 animate-pulse' : 'bg-black/50 text-white border-white/10'}`}>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <Link href={`/dashboard/courses/${courseId}`} className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+        <ArrowLeft size={16} />
+        Back to course
+      </Link>
+
+      <Card className="sticky top-4 z-20 rounded-lg p-5 shadow-sm">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <StatusBadge variant="info">Course test</StatusBadge>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">{test.title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {answeredCount} of {questions.length} answered
+            </p>
+          </div>
+          <div className={cn(
+            'inline-flex items-center gap-2 rounded-lg border px-4 py-3 font-mono text-xl font-semibold',
+            timeLeft < 60 ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'bg-secondary text-foreground',
+          )}>
+            <Clock3 size={20} />
             {formatTime(timeLeft)}
-         </div>
-      </div>
+          </div>
+        </div>
+        <ProgressBar value={completion} className="mt-5" />
+      </Card>
 
-      <div className="space-y-6">
-         {test.questions.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((q: any, i: number) => (
-            <div key={q.id} className="glass p-6 rounded-xl border-l-4 border-l-blue-500">
-               <h3 className="text-lg font-medium mb-4 pr-8"><span className="text-blue-400 mr-2">{i + 1}.</span> {q.question_text}</h3>
-               
-               <div className="space-y-2">
-                  {['A', 'B', 'C', 'D'].map(opt => {
-                     const optText = q[`option_${opt.toLowerCase()}`];
-                     const isSelected = answers[q.id] === opt;
-                     
-                     return (
-                        <button 
-                           key={opt}
-                           onClick={() => handleSelect(q.id, opt)}
-                           className={`w-full text-left p-4 rounded-lg border transition-all ${isSelected ? 'bg-blue-600/20 border-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-black/40 border-white/5 hover:bg-white/5 hover:border-white/20'}`}
-                        >
-                           <span className={`font-bold mr-3 ${isSelected ? 'text-blue-400' : 'text-muted-foreground'}`}>{opt}.</span>
-                           {optText}
-                        </button>
-                     );
+      <div className="space-y-5">
+        {questions.map((question, index) => (
+          <Card key={question.id} className="rounded-lg p-6 shadow-sm">
+            <div className="flex gap-4">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+                {index + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-semibold leading-7">{question.question_text}</h2>
+                <div className="mt-5 grid gap-3">
+                  {options.map((option) => {
+                    const selected = answers[question.id] === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => handleSelect(question.id, option)}
+                        className={cn(
+                          'flex w-full items-start gap-3 rounded-lg border p-4 text-left transition',
+                          selected ? 'border-primary bg-primary/10 text-primary' : 'bg-background hover:border-primary/40',
+                        )}
+                      >
+                        {selected ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" /> : <Circle size={18} className="mt-0.5 shrink-0 text-muted-foreground" />}
+                        <span>
+                          <span className="font-semibold">{option}.</span> {optionText(question, option)}
+                        </span>
+                      </button>
+                    );
                   })}
-               </div>
+                </div>
+              </div>
             </div>
-         ))}
+          </Card>
+        ))}
       </div>
 
-      <div className="flex justify-end pt-6">
-         <button 
-            onClick={handleSubmit} 
-            disabled={submitting}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50"
-         >
-            {submitting ? 'Submitting...' : 'Submit Answers & Finish'}
-         </button>
+      <div className="flex justify-end">
+        <Button onClick={handleSubmit} disabled={submitting || questions.length === 0} size="lg">
+          <Send size={18} className="mr-2" />
+          {submitting ? 'Submitting...' : 'Submit answers'}
+        </Button>
       </div>
     </div>
   );

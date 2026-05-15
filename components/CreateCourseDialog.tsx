@@ -67,6 +67,16 @@ export function CreateCourseDialog() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label htmlFor="thumbnail_url" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Thumbnail URL</label>
+                <Input
+                  id="thumbnail_url"
+                  name="thumbnail_url"
+                  type="url"
+                  placeholder="https://images.unsplash.com/..."
+                />
+              </div>
+
               <div className="flex gap-4 pt-4 mt-6 border-t border-border">
                 <Button 
                   type="button" 

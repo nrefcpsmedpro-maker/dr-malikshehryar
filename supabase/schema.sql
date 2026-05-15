@@ -6,6 +6,8 @@ create table profiles (
   id uuid references auth.users on delete cascade not null primary key,
   email text unique not null,
   full_name text,
+  mobile_number text,
+  cnic_number text,
   role user_role default 'student',
   is_approved boolean default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -32,8 +34,16 @@ create policy "Admins can update all profiles." on profiles
 create function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, role, full_name, is_approved)
-  values (new.id, new.email, 'student', new.raw_user_meta_data->>'full_name', false);
+  insert into public.profiles (id, email, role, full_name, mobile_number, cnic_number, is_approved)
+  values (
+    new.id,
+    new.email,
+    'student',
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'mobile_number',
+    new.raw_user_meta_data->>'cnic_number',
+    false
+  );
   return new;
 end;
 $$ language plpgsql security definer set search_path = public;

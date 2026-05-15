@@ -2,6 +2,10 @@
 
 import { useEffect, useCallback, useRef, useState } from 'react';
 
+type WindowWithEvent = Window & typeof globalThis & {
+  Event: typeof Event;
+};
+
 /**
  * PageSecurityShield — Comprehensive client-side content protection.
  *
@@ -47,12 +51,13 @@ export default function PageSecurityShield() {
       iframe.style.display = 'none';
       document.body.appendChild(iframe);
       if (iframe.contentWindow) {
-        pristinePreventDefault = (iframe.contentWindow as any).Event.prototype.preventDefault;
-        pristineStopImmediate = (iframe.contentWindow as any).Event.prototype.stopImmediatePropagation;
-        pristineStop = (iframe.contentWindow as any).Event.prototype.stopPropagation;
+        const frameWindow = iframe.contentWindow as WindowWithEvent;
+        pristinePreventDefault = frameWindow.Event.prototype.preventDefault;
+        pristineStopImmediate = frameWindow.Event.prototype.stopImmediatePropagation;
+        pristineStop = frameWindow.Event.prototype.stopPropagation;
       }
       document.body.removeChild(iframe);
-    } catch (e) {
+    } catch {
       // Ignore if iframe block fails
     }
 

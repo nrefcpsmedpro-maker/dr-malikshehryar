@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/utils/cn';
+import { createClient } from '@/utils/supabase/client';
 
 declare global {
   interface Window {
@@ -38,6 +39,7 @@ declare global {
         destroy: () => void;
       };
       PlayerState: {
+        ENDED: number;
         PLAYING: number;
         PAUSED: number;
         BUFFERING: number;
@@ -109,12 +111,31 @@ type VideoSessionResponse = {
 
 const PLAYBACK_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
-export default function VideoPlayer({ playbackToken }: { playbackToken: string }) {
+type ProgressContext = {
+  courseId: string;
+  lessonId: string;
+};
+
+type PictureInPictureElement = HTMLIFrameElement & {
+  requestPictureInPicture?: () => Promise<void>;
+};
+
+export default function VideoPlayer({
+  playbackToken,
+  progressContext,
+}: {
+  playbackToken: string;
+  progressContext?: ProgressContext;
+}) {
+  const supabase = useMemo(() => createClient(), []);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerHostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<InstanceType<NonNullable<typeof window.YT>['Player']> | null>(null);
   const hideControlsTimerRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
   const progressUpdateTimerRef = useRef<number | ReturnType<typeof setInterval> | null>(null);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const userIdRef = useRef<string | null>(null);
 
   const [videoId, setVideoId] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -132,6 +153,57 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'speed' | 'quality'>('speed');
   const [isBuffering, setIsBuffering] = useState(false);
+
+  const saveProgress = useCallback(
+    async (forceComplete = false) => {
+      if (!progressContext || !userIdRef.current) return;
+
+      const roundedCurrentTime = Math.max(0, Math.floor(currentTimeRef.current));
+      const roundedDuration = Math.max(0, Math.floor(durationRef.current));
+      const completed = forceComplete || (roundedDuration > 0 && roundedCurrentTime / roundedDuration >= 0.9);
+      const payload: {
+        user_id: string;
+        course_id: string;
+        lesson_id: string;
+        last_position_seconds: number;
+        duration_seconds: number;
+        updated_at: string;
+        completed_at?: string;
+      } = {
+        user_id: userIdRef.current,
+        course_id: progressContext.courseId,
+        lesson_id: progressContext.lessonId,
+        last_position_seconds: roundedCurrentTime,
+        duration_seconds: roundedDuration,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (completed) {
+        payload.completed_at = new Date().toISOString();
+      }
+
+      await supabase.from('lesson_progress').upsert(
+        [payload],
+        { onConflict: 'user_id,lesson_id' },
+      );
+    },
+    [progressContext, supabase],
+  );
+
+  useEffect(() => {
+    if (!progressContext) return;
+
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) {
+        userIdRef.current = data.user?.id ?? null;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [progressContext, supabase]);
 
   const syncPlayerSize = useCallback(() => {
     if (!playerRef.current) {
@@ -239,7 +311,9 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
             const initialVolume = storedVolume ? parseInt(storedVolume, 10) : 80;
             playerRef.current.setVolume(initialVolume);
             setVolume(initialVolume);
-            setDuration(playerRef.current.getDuration());
+            const initialDuration = playerRef.current.getDuration();
+            durationRef.current = initialDuration;
+            setDuration(initialDuration);
             setReady(true);
 
             const qualities = playerRef.current.getAvailableQualityLevels();
@@ -251,6 +325,12 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
             const ytState = window.YT?.PlayerState;
             setIsPlaying(event.data === ytState?.PLAYING);
             setIsBuffering(event.data === ytState?.BUFFERING);
+            if (event.data === ytState?.PAUSED) {
+              void saveProgress();
+            }
+            if (event.data === ytState?.ENDED) {
+              void saveProgress(true);
+            }
           },
           onPlaybackQualityChange: (event) => {
             if (disposed) return;
@@ -272,7 +352,7 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
       playerRef.current = null;
       setReady(false);
     };
-  }, [videoId, syncPlayerSize]);
+  }, [videoId, syncPlayerSize, saveProgress]);
 
   useEffect(() => {
     if (!ready || !containerRef.current) {
@@ -296,8 +376,12 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
     if (ready && isPlaying) {
       progressUpdateTimerRef.current = window.setInterval(() => {
         if (!playerRef.current) return;
-        setCurrentTime(playerRef.current.getCurrentTime());
-        setDuration(playerRef.current.getDuration());
+        const nextCurrentTime = playerRef.current.getCurrentTime();
+        const nextDuration = playerRef.current.getDuration();
+        currentTimeRef.current = nextCurrentTime;
+        durationRef.current = nextDuration;
+        setCurrentTime(nextCurrentTime);
+        setDuration(nextDuration);
       }, 250);
     } else {
       if (progressUpdateTimerRef.current) {
@@ -312,6 +396,19 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
       }
     };
   }, [ready, isPlaying]);
+
+  useEffect(() => {
+    if (!ready || !progressContext) return;
+
+    const interval = window.setInterval(() => {
+      void saveProgress();
+    }, 15000);
+
+    return () => {
+      window.clearInterval(interval);
+      void saveProgress();
+    };
+  }, [ready, progressContext, saveProgress]);
 
   useEffect(() => {
     if (hideControlsTimerRef.current) {
@@ -360,6 +457,7 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
   const handleSeek = useCallback((seconds: number) => {
     if (!playerRef.current || !ready) return;
     playerRef.current.seekTo(seconds, true);
+    currentTimeRef.current = seconds;
     setCurrentTime(seconds);
     scheduleHideControls();
   }, [ready, scheduleHideControls]);
@@ -416,9 +514,9 @@ export default function VideoPlayer({ playbackToken }: { playbackToken: string }
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
       } else if (document.pictureInPictureEnabled) {
-        const videoElement = playerHostRef.current.querySelector('iframe');
-        if (videoElement) {
-          await (videoElement as any).requestPictureInPicture();
+        const videoElement = playerHostRef.current.querySelector('iframe') as PictureInPictureElement | null;
+        if (videoElement?.requestPictureInPicture) {
+          await videoElement.requestPictureInPicture();
         }
       }
     } catch {

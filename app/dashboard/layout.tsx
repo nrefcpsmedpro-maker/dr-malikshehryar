@@ -1,6 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import Navbar from '@/components/Navbar';
-import PageSecurityShield from '@/components/PageSecurityShield';
+import AppShell from '@/components/lms/AppShell';
 import { redirect } from 'next/navigation';
 
 import { cookies } from 'next/headers';
@@ -18,14 +17,16 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', user.id)
+    .single();
+
   // We don't strictly reject admins here; they might want to view the student perspective.
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <PageSecurityShield />
-      <Navbar role="student" />
-      <main className="flex-1 pt-24 px-6 pb-12 max-w-7xl mx-auto w-full">
-        {children}
-      </main>
-    </div>
+    <AppShell role="student" userLabel={profile?.full_name || profile?.email}>
+      {children}
+    </AppShell>
   );
 }

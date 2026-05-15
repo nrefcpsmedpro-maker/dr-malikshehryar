@@ -1,45 +1,61 @@
-import { createClient } from '@/utils/supabase/server';
+import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Card } from '@/components/ui/card';
+import { Clock3, GraduationCap, LogOut, ShieldCheck } from 'lucide-react';
+import { createClient } from '@/utils/supabase/server';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 export default async function PendingApprovalPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-     redirect('/login');
+    redirect('/login');
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background -z-10" />
+    <main className="flex min-h-screen items-center justify-center bg-secondary/40 px-5 py-10">
+      <Card className="w-full max-w-2xl rounded-lg p-8 text-center shadow-sm">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Clock3 size={32} />
+        </div>
+        <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Account review</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Pending administrator approval</h1>
+        <p className="mx-auto mt-4 max-w-xl leading-7 text-muted-foreground">
+          Your MedPro LMS account has been created. An administrator needs to approve access
+          before courses, lessons, exams, and certificates become available.
+        </p>
 
-       <Card className="max-w-lg w-full p-12 flex flex-col items-center">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 border border-primary/20">
-             <span className="text-3xl text-primary">⏳</span>
+        <div className="mt-8 grid gap-4 text-left sm:grid-cols-2">
+          <div className="rounded-lg border bg-background p-4">
+            <ShieldCheck className="text-emerald-600 dark:text-emerald-300" size={20} />
+            <p className="mt-3 text-sm font-semibold">Access is protected</p>
+            <p className="mt-1 text-sm text-muted-foreground">Only approved students can open academy content.</p>
           </div>
-
-          <h1 className="text-3xl font-bold tracking-tight mb-3">Pending Approval</h1>
-          <p className="text-muted-foreground mb-8 text-lg">
-            Your account has been created successfully, but an administrator must approve your access before you can view courses.
-          </p>
-
-          <div className="p-4 rounded-lg bg-black/40 border border-white/5 inline-flex items-center gap-3">
-             <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-             <span className="text-sm font-medium">Status: Awaiting Administrator Review</span>
+          <div className="rounded-lg border bg-background p-4">
+            <GraduationCap className="text-primary" size={20} />
+            <p className="mt-3 text-sm font-semibold">Courses stay ready</p>
+            <p className="mt-1 text-sm text-muted-foreground">Once approved, your dashboard will open automatically.</p>
           </div>
+        </div>
 
-          {/* Added logout button so they aren't trapped if they want to switch accounts */}
-          <form action="/auth/signout" method="post" className="mt-8">
-             <Button variant="link" type="submit" className="text-muted-foreground">
-                 Sign Out
-             </Button>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Button asChild variant="secondary">
+            <Link href="/">Back to academy</Link>
+          </Button>
+          <form action="/auth/signout" method="post">
+            <Button variant="ghost" type="submit" className="text-muted-foreground hover:text-destructive">
+              <LogOut size={17} className="mr-2" />
+              Sign out
+            </Button>
           </form>
-       </Card>
-    </div>
+        </div>
+      </Card>
+    </main>
   );
 }

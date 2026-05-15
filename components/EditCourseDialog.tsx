@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { X, Edit2 } from 'lucide-react';
+import type { Course } from '@/types/lms';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -17,7 +18,7 @@ function SubmitButton() {
   );
 }
 
-export function EditCourseDialog({ course }: { course: any }) {
+export function EditCourseDialog({ course }: { course: Course }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSubmit = async (formData: FormData) => {
@@ -68,8 +69,19 @@ export function EditCourseDialog({ course }: { course: any }) {
                   id="description"
                   name="description"
                   rows={4}
-                  defaultValue={course.description}
+                  defaultValue={course.description || ''}
                   className="w-full px-3 py-2 border border-input bg-transparent rounded-md text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="thumbnail_url" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Thumbnail URL</label>
+                <Input
+                  id="thumbnail_url"
+                  name="thumbnail_url"
+                  type="url"
+                  defaultValue={course.thumbnail_url || ''}
+                  placeholder="https://..."
                 />
               </div>
 

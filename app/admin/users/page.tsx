@@ -11,6 +11,8 @@ type UserProfile = {
   id: string;
   email: string;
   full_name: string | null;
+  mobile_number: string | null;
+  cnic_number: string | null;
   role: 'admin' | 'student';
   is_approved: boolean;
   created_at: string;
@@ -59,7 +61,7 @@ export default async function AdminUsersPage() {
   const [{ data: users }, { data: courses }, { data: enrollments }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, full_name, role, is_approved, created_at')
+      .select('id, email, full_name, mobile_number, cnic_number, role, is_approved, created_at')
       .order('created_at', { ascending: false }),
     supabase
       .from('courses')
@@ -107,9 +109,20 @@ export default async function AdminUsersPage() {
 
     await requireAdmin();
 
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const fullName = formData.get('fullName') as string;
+    const rawEmail = formData.get('email');
+    const rawPassword = formData.get('password');
+    const rawFullName = formData.get('fullName');
+    const rawMobileNumber = formData.get('mobileNumber');
+    const rawCnicNumber = formData.get('cnicNumber');
+    const email = typeof rawEmail === 'string' ? rawEmail.trim() : '';
+    const password = typeof rawPassword === 'string' ? rawPassword : '';
+    const fullName = typeof rawFullName === 'string' ? rawFullName.trim() : '';
+    const mobileNumber = typeof rawMobileNumber === 'string' ? rawMobileNumber.trim() : '';
+    const cnicNumber = typeof rawCnicNumber === 'string' ? rawCnicNumber.trim() : '';
+
+    if (!email || !password || !fullName || !mobileNumber || !cnicNumber) {
+      throw new Error('Full name, email, mobile number, CNIC, and password are required');
+    }
     
     const adminClient = createAdminClient();
     
@@ -117,7 +130,11 @@ export default async function AdminUsersPage() {
        email,
        password,
        email_confirm: true,
-       user_metadata: { full_name: fullName }
+       user_metadata: {
+         full_name: fullName,
+         mobile_number: mobileNumber,
+         cnic_number: cnicNumber,
+       }
     });
 
     if (error) {
@@ -128,7 +145,12 @@ export default async function AdminUsersPage() {
     if (newUser.user?.id) {
        const { error: approvalError } = await adminClient
          .from('profiles')
-         .update({ is_approved: true })
+         .update({
+           full_name: fullName,
+           mobile_number: mobileNumber,
+           cnic_number: cnicNumber,
+           is_approved: true,
+         })
          .eq('id', newUser.user.id);
 
        if (approvalError) {
@@ -244,6 +266,12 @@ export default async function AdminUsersPage() {
                 <div>
                    <h4 className="font-bold text-lg">{user.full_name || 'No Name'}</h4>
                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                   {(user.mobile_number || user.cnic_number) && (
+                     <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+                       {user.mobile_number && <p>Mobile: {user.mobile_number}</p>}
+                       {user.cnic_number && <p>CNIC: {user.cnic_number}</p>}
+                     </div>
+                   )}
                    
                    <div className="flex gap-2 mt-2">
                       <span className="text-xs font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
@@ -368,6 +396,16 @@ export default async function AdminUsersPage() {
                  <div className="space-y-1">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
                     <Input type="email" name="email" required placeholder="sarah@medpro.com" />
+                 </div>
+                 <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Number</label>
+                       <Input type="tel" name="mobileNumber" required placeholder="+92 300 0000000" />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">CNIC Number</label>
+                       <Input type="text" inputMode="numeric" name="cnicNumber" required placeholder="35202-1234567-1" />
+                    </div>
                  </div>
                  <div className="space-y-1">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Temporary Password</label>

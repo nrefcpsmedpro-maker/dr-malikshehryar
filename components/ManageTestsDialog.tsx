@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { getCourseData, addTestAction } from '@/app/admin/courses/actions';
@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { X, FileQuestion } from 'lucide-react';
+
+type CourseData = Awaited<ReturnType<typeof getCourseData>>;
+type DialogTest = NonNullable<NonNullable<CourseData>['mock_tests']>[number];
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -20,18 +23,18 @@ function SubmitButton() {
 
 export function ManageTestsDialog({ courseId, courseTitle }: { courseId: string, courseTitle: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [course, setCourse] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [course, setCourse] = useState<CourseData>(null);
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (isOpen && !course) {
-      setIsLoading(true);
-      getCourseData(courseId).then(data => {
+  const openDialog = () => {
+    setIsOpen(true);
+    if (!course) {
+      startTransition(async () => {
+        const data = await getCourseData(courseId);
         setCourse(data);
-        setIsLoading(false);
       });
     }
-  }, [isOpen, courseId, course]);
+  };
 
   const handleAddTest = async (formData: FormData) => {
      await addTestAction(courseId, formData);
@@ -42,7 +45,7 @@ export function ManageTestsDialog({ courseId, courseTitle }: { courseId: string,
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
+      <Button variant="outline" size="sm" onClick={openDialog}>
         <FileQuestion className="mr-2" size={14} />
         Tests
       </Button>
@@ -61,7 +64,7 @@ export function ManageTestsDialog({ courseId, courseTitle }: { courseId: string,
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              {isLoading ? (
+              {isPending && !course ? (
                  <div className="text-center py-12 text-muted-foreground">Loading tests...</div>
               ) : (
                  <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
@@ -84,7 +87,7 @@ export function ManageTestsDialog({ courseId, courseTitle }: { courseId: string,
 
                    <div className="md:col-span-3 space-y-3">
                       <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-2">Available Tests</h3>
-                      {course?.mock_tests?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((test: any) => (
+                      {[...(course?.mock_tests ?? [])].sort((a: DialogTest, b: DialogTest) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((test: DialogTest) => (
                          <div key={test.id} className="p-4 bg-secondary/30 rounded-md border border-border border-l-4 border-l-purple-500 flex flex-col gap-3">
                             <div>
                                <h4 className="font-bold text-sm">{test.title}</h4>

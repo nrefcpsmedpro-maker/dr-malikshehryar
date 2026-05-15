@@ -1,447 +1,412 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Send } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { Clock, ChevronRight, ChevronLeft } from 'lucide-react';
 import ExamResults from '@/components/ExamResults';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ProgressBar } from '@/components/lms/ProgressBar';
+import { StatusBadge } from '@/components/lms/StatusBadge';
+import type { ExamAttemptMode, ExamQuestion, ExamQuestionOrder, ExamResult, ExamTimeMode, SubjectScore } from '@/types/lms';
+import { cn } from '@/utils/cn';
+import { percentage, sortByOrder } from '@/utils/lms';
 
-interface ExamQuestion {
-    id: string;
-    question_text: string;
-    option_a: string;
-    option_b: string;
-    option_c: string;
-    option_d: string;
-    correct_option: string;
-    created_at: string;
-    subjectId?: string;
-    subjectTitle?: string;
+type OptionKey = 'A' | 'B' | 'C' | 'D';
+
+type EngineQuestion = ExamQuestion & {
+  subjectId: string;
+  subjectTitle: string;
+  order_index: number;
+};
+
+type EngineSubject = {
+  id: string;
+  title: string;
+  order_index: number;
+  time_limit_minutes: number | null;
+  questions: ExamQuestion[];
+};
+
+type ExamData = {
+  id: string;
+  title: string;
+  attempt_mode?: ExamAttemptMode;
+  time_mode: ExamTimeMode;
+  total_time_minutes: number;
+  question_order: ExamQuestionOrder;
+  subjects: EngineSubject[];
+};
+
+type GroupedSubject = {
+  subjectId: string;
+  subjectTitle: string;
+  timeLimitMinutes: number;
+  orderIndex: number;
+  questions: EngineQuestion[];
+};
+
+const options: OptionKey[] = ['A', 'B', 'C', 'D'];
+
+function shuffleArray<T>(array: T[]) {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
-interface ExamSubject {
-    id: string;
-    title: string;
-    order_index: number;
-    time_limit_minutes: number | null;
-    questions: ExamQuestion[];
+function optionText(question: ExamQuestion, option: OptionKey) {
+  return question[`option_${option.toLowerCase()}` as keyof Pick<ExamQuestion, 'option_a' | 'option_b' | 'option_c' | 'option_d'>];
 }
 
-interface GroupedSubject {
-    subjectId: string;
-    subjectTitle: string;
-    timeLimitMinutes: number;
-    questions: ExamQuestion[];
-}
+export default function ExamEngine({
+  exam,
+  resultSubjectId = null,
+}: {
+  exam: ExamData;
+  resultSubjectId?: string | null;
+}) {
+  const supabase = createClient();
+  const sortedSubjects = useMemo(() => sortByOrder(exam.subjects), [exam.subjects]);
 
-interface ClientExamResult {
-    id: string;
-    total_score: number;
-    total_questions: number;
-    subject_scores: Array<{
-        subject_id: string;
-        subject_title: string;
-        score: number;
-        total: number;
-        order_index: number;
-    }>;
-    created_at: string;
-}
+  const groupedQuestions = useMemo<GroupedSubject[]>(() => {
+    return sortedSubjects
+      .map((subject) => ({
+        subjectId: subject.id,
+        subjectTitle: subject.title,
+        orderIndex: subject.order_index,
+        timeLimitMinutes: subject.time_limit_minutes || exam.total_time_minutes,
+        questions: [...subject.questions]
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .map((question) => ({
+            ...question,
+            subjectId: subject.id,
+            subjectTitle: subject.title,
+            order_index: subject.order_index,
+          })),
+      }))
+      .filter((subject) => subject.questions.length > 0);
+  }, [exam.total_time_minutes, sortedSubjects]);
 
-interface ExamData {
-    id: string;
-    title: string;
-    attempt_mode?: 'full_exam' | 'subject_wise';
-    time_mode: 'total' | 'per_subject';
-    total_time_minutes: number;
-    question_order: 'mixed' | 'by_subject';
-    subjects: ExamSubject[];
-}
+  const orderedQuestions = useMemo(() => {
+    const questions = groupedQuestions.flatMap((subject) => subject.questions);
+    return exam.question_order === 'mixed' ? shuffleArray(questions) : questions;
+  }, [exam.question_order, groupedQuestions]);
 
-interface ExamEngineProps {
-    exam: ExamData;
-    resultSubjectId?: string | null;
-}
+  const groupedMode = exam.question_order === 'by_subject';
+  const initialSeconds = groupedMode
+    ? (groupedQuestions[0]?.timeLimitMinutes ?? exam.total_time_minutes) * 60
+    : exam.total_time_minutes * 60;
 
-function shuffleArray<T>(array: T[]): T[] {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  const [currentSubjectIndex, setCurrentSubjectIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, OptionKey>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submittedResult, setSubmittedResult] = useState<ExamResult | null>(null);
+  const [timeLeft, setTimeLeft] = useState(initialSeconds);
+
+  const totalQuestions = orderedQuestions.length;
+  const currentQuestion = groupedMode
+    ? groupedQuestions[currentSubjectIndex]?.questions[currentQuestionIndex] ?? null
+    : orderedQuestions[currentQuestionIndex] ?? null;
+
+  const currentOverallIndex = groupedMode
+    ? groupedQuestions.slice(0, currentSubjectIndex).reduce((sum, subject) => sum + subject.questions.length, 0) + currentQuestionIndex
+    : currentQuestionIndex;
+
+  const isLastQuestion = currentOverallIndex >= totalQuestions - 1;
+
+  const submitExam = useCallback(async () => {
+    if (submitting || submittedResult) return;
+    setSubmitting(true);
+
+    const subjectScores: SubjectScore[] = [];
+    let totalScore = 0;
+    let questionCount = 0;
+
+    for (const subject of sortedSubjects) {
+      let score = 0;
+      for (const question of subject.questions) {
+        questionCount++;
+        if (answers[question.id] === question.correct_option) {
+          score++;
+          totalScore++;
+        }
+      }
+
+      subjectScores.push({
+        subject_id: subject.id,
+        subject_title: subject.title,
+        score,
+        total: subject.questions.length,
+        order_index: subject.order_index,
+      });
     }
-    return shuffled;
-}
 
-function getOptionText(question: ExamQuestion, option: string): string {
-    const key = `option_${option.toLowerCase()}` as keyof ExamQuestion;
-    return question[key] as string;
-}
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-export default function ExamEngine({ exam, resultSubjectId = null }: ExamEngineProps) {
-    const supabase = createClient();
-
-    const sortedSubjects = [...exam.subjects].sort((a, b) => a.order_index - b.order_index);
-
-    const allQuestions: ExamQuestion[] = sortedSubjects.flatMap(subject =>
-        subject.questions.map(q => ({ ...q, subjectId: subject.id, subjectTitle: subject.title }))
-    );
-
-    const shuffledQuestions = exam.question_order === 'mixed' ? shuffleArray(allQuestions) : allQuestions;
-
-    const groupedQuestions: GroupedSubject[] | null = exam.question_order === 'by_subject'
-        ? sortedSubjects
-            .map(subject => ({
-                subjectId: subject.id,
-                subjectTitle: subject.title,
-                timeLimitMinutes: subject.time_limit_minutes || exam.total_time_minutes,
-                questions: [...subject.questions].sort((a, b) =>
-                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                )
-            }))
-            .filter(subject => subject.questions.length > 0)
-        : null;
-
-    const [currentSubjectIndex, setCurrentSubjectIndex] = useState(0);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, string>>({});
-    const [submitting, setSubmitting] = useState(false);
-    const [submittedResult, setSubmittedResult] = useState<ClientExamResult | null>(null);
-
-    const getTimeLimit = (): number => {
-        if (exam.time_mode === 'per_subject' && groupedQuestions) {
-            const subject = groupedQuestions[currentSubjectIndex];
-            if (!subject) return exam.total_time_minutes * 60;
-            return subject.timeLimitMinutes * 60;
-        }
-        return exam.total_time_minutes * 60;
+    const resultPayload = {
+      total_score: totalScore,
+      total_questions: questionCount,
+      subject_scores: subjectScores,
     };
 
-    const [timeLeft, setTimeLeft] = useState(() => getTimeLimit());
+    if (user) {
+      const { data: insertedResult } = await supabase
+        .from('exam_results')
+        .insert([
+          {
+            user_id: user.id,
+            exam_id: exam.id,
+            subject_id: resultSubjectId,
+            ...resultPayload,
+          },
+        ])
+        .select('id, total_score, total_questions, subject_scores, created_at')
+        .single();
 
-    useEffect(() => {
-        setTimeLeft(getTimeLimit());
-    }, [currentSubjectIndex, exam.time_mode, exam.total_time_minutes]);
-
-    useEffect(() => {
-        if (timeLeft <= 0) {
-            handleSubmit();
-            return;
-        }
-        const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
-        return () => clearInterval(timer);
-    }, [timeLeft]);
-
-    const handleSelect = (questionId: string, option: string) => {
-        setAnswers(prev => ({ ...prev, [questionId]: option }));
-    };
-
-    const handleNext = () => {
-        if (isLastQuestion()) return;
-
-        if (groupedQuestions) {
-            const currentData = groupedQuestions[currentSubjectIndex];
-            if (currentQuestionIndex < currentData.questions.length - 1) {
-                setCurrentQuestionIndex(prev => prev + 1);
-            } else if (currentSubjectIndex < groupedQuestions.length - 1) {
-                setCurrentSubjectIndex(prev => prev + 1);
-                setCurrentQuestionIndex(0);
-            }
-        } else {
-            if (currentQuestionIndex < shuffledQuestions.length - 1) {
-                setCurrentQuestionIndex(prev => prev + 1);
-            }
-        }
-    };
-
-    const handlePrevious = () => {
-        if (groupedQuestions) {
-            if (currentQuestionIndex > 0) {
-                setCurrentQuestionIndex(prev => prev - 1);
-            } else if (currentSubjectIndex > 0) {
-                setCurrentSubjectIndex(prev => prev - 1);
-                setCurrentQuestionIndex(groupedQuestions[currentSubjectIndex - 1].questions.length - 1);
-            }
-        } else {
-            if (currentQuestionIndex > 0) {
-                setCurrentQuestionIndex(prev => prev - 1);
-            }
-        }
-    };
-
-    const handleSubmit = async () => {
-        if (submitting || submittedResult) return;
-        setSubmitting(true);
-
-        const subjectScores: Array<{
-            subject_id: string;
-            subject_title: string;
-            score: number;
-            total: number;
-            order_index: number;
-        }> = [];
-
-        let totalScore = 0;
-        let totalQuestions = 0;
-
-        for (const subject of sortedSubjects) {
-            let score = 0;
-            for (const q of subject.questions) {
-                totalQuestions++;
-                if (answers[q.id] === q.correct_option) {
-                    score++;
-                    totalScore++;
-                }
-            }
-            subjectScores.push({
-                subject_id: subject.id,
-                subject_title: subject.title,
-                score,
-                total: subject.questions.length,
-                order_index: subject.order_index
-            });
-        }
-
-        const { data: { user } } = await supabase.auth.getUser();
-
-        const resultPayload = {
-            total_score: totalScore,
-            total_questions: totalQuestions,
-            subject_scores: subjectScores
-        };
-
-        if (user) {
-            const { data: insertedResult } = await supabase
-                .from('exam_results')
-                .insert([{
-                    user_id: user.id,
-                    exam_id: exam.id,
-                    subject_id: resultSubjectId,
-                    ...resultPayload
-                }])
-                .select('id, total_score, total_questions, subject_scores, created_at')
-                .single();
-
-            if (insertedResult) {
-                setSubmittedResult(insertedResult as ClientExamResult);
-                setSubmitting(false);
-                return;
-            }
-        }
-
-        setSubmittedResult({
-            id: `local-${exam.id}`,
-            created_at: new Date().toISOString(),
-            ...resultPayload
-        });
+      if (insertedResult) {
+        setSubmittedResult(insertedResult as ExamResult);
         setSubmitting(false);
-    };
-
-    const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    };
-
-    const getCurrentQuestion = (): ExamQuestion | null => {
-        if (groupedQuestions) {
-            if (currentSubjectIndex < 0 || currentSubjectIndex >= groupedQuestions.length) return null;
-            const subjectData = groupedQuestions[currentSubjectIndex];
-            if (!subjectData) return null;
-            if (currentQuestionIndex < 0 || currentQuestionIndex >= subjectData.questions.length) return null;
-            return subjectData.questions[currentQuestionIndex] || null;
-        }
-        if (currentQuestionIndex < 0 || currentQuestionIndex >= shuffledQuestions.length) return null;
-        return shuffledQuestions[currentQuestionIndex] || null;
-    };
-
-    const currentQuestion = getCurrentQuestion();
-
-    const getTotalQuestions = (): number => groupedQuestions
-        ? sortedSubjects.reduce((sum, s) => sum + s.questions.length, 0)
-        : shuffledQuestions.length;
-
-    const getCurrentOverallIndex = (): number => {
-        if (groupedQuestions) {
-            let idx = 0;
-            for (let i = 0; i < currentSubjectIndex; i++) {
-                idx += groupedQuestions[i].questions.length;
-            }
-            return idx + currentQuestionIndex;
-        }
-        return currentQuestionIndex;
-    };
-
-    const isLastQuestion = (): boolean => {
-        if (groupedQuestions) {
-            return currentSubjectIndex === groupedQuestions.length - 1 &&
-                currentQuestionIndex === groupedQuestions[currentSubjectIndex].questions.length - 1;
-        }
-        return currentQuestionIndex === shuffledQuestions.length - 1;
-    };
-
-    const currentSubjectTitle = groupedQuestions ? groupedQuestions[currentSubjectIndex]?.subjectTitle : null;
-    const currentSubjectQuestionCount = groupedQuestions ? groupedQuestions[currentSubjectIndex]?.questions.length || 0 : 0;
-
-    if (submittedResult) {
-        return <ExamResults result={submittedResult} exam={{ id: exam.id, title: exam.title }} />;
+        return;
+      }
     }
 
-    if (!currentQuestion) {
-        return (
-            <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
-                <div className="glass-card p-12 rounded-2xl border border-destructive/20 max-w-md">
-                    <h2 className="text-2xl font-bold mb-2">No Questions Available</h2>
-                    <p className="text-muted-foreground mb-6">
-                        This exam doesn&apos;t have any questions yet. Please contact your administrator.
-                    </p>
-                </div>
-            </div>
-        );
+    setSubmittedResult({
+      id: `local-${exam.id}`,
+      created_at: new Date().toISOString(),
+      ...resultPayload,
+    });
+    setSubmitting(false);
+  }, [answers, exam.id, resultSubjectId, sortedSubjects, submittedResult, submitting, supabase]);
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      const timeout = window.setTimeout(() => {
+        void submitExam();
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
 
-return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
-        <div className="flex items-center justify-between sticky top-4 z-10 glass-card p-4 rounded-xl border-blue-500/30">
-                <div>
-                    <h2 className="text-xl font-bold">{exam.title}</h2>
-                    {groupedQuestions ? (
-                        <p className="text-sm text-muted-foreground">
-                            {currentSubjectTitle} - Question {currentQuestionIndex + 1} of {currentSubjectQuestionCount}
-                        </p>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            Question {currentQuestionIndex + 1} of {shuffledQuestions.length}
-                        </p>
-                    )}
-                </div>
-                <div className={`text-2xl font-mono p-3 rounded-lg border flex items-center gap-2 ${
-                    timeLeft < 60
-                        ? 'bg-destructive/20 text-destructive border-destructive/30 animate-pulse'
-                        : 'bg-black/50 text-white border-white/10'
-                }`}>
-                    <Clock size={20} />
-                    {formatTime(timeLeft)}
-                </div>
-            </div>
+    const timer = window.setInterval(() => setTimeLeft((value) => value - 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [submitExam, timeLeft]);
 
-            {groupedQuestions && (
-                <div className="flex items-center gap-2 flex-wrap">
-                    {groupedQuestions.map((subject, idx) => (
-                        <button
-                            key={subject.subjectId}
-                            onClick={() => {
-                                setCurrentSubjectIndex(idx);
-                                setCurrentQuestionIndex(0);
-                            }}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                                idx === currentSubjectIndex
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
-                            }`}
-                        >
-                            {subject.subjectTitle}
-                        </button>
-                    ))}
-                </div>
-            )}
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+  };
 
-            <div className="glass p-6 rounded-xl border-l-4 border-l-blue-500">
-                <h3 className="text-lg font-medium mb-4 pr-8">
-                    <span className="text-blue-400 mr-2">{getCurrentOverallIndex() + 1}.</span>
-                    {currentQuestion.question_text}
-                </h3>
+  const handleSelect = (questionId: string, option: OptionKey) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: option }));
+  };
 
-                <div className="space-y-2">
-                    {['A', 'B', 'C', 'D'].map(opt => {
-                        const optText = getOptionText(currentQuestion, opt);
-                        const isSelected = answers[currentQuestion.id] === opt;
+  const goToSubject = (subjectIndex: number) => {
+    const target = groupedQuestions[subjectIndex];
+    if (!target) return;
+    setCurrentSubjectIndex(subjectIndex);
+    setCurrentQuestionIndex(0);
+    if (exam.time_mode === 'per_subject') {
+      setTimeLeft(target.timeLimitMinutes * 60);
+    }
+  };
 
-                        return (
-                            <button
-                                key={opt}
-                                onClick={() => handleSelect(currentQuestion.id, opt)}
-                                className={`w-full text-left p-4 rounded-lg border transition-all ${
-                                    isSelected
-                                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                                        : 'bg-black/40 border-white/5 hover:bg-white/5 hover:border-white/20'
-                                }`}
-                            >
-                                <span className={`font-bold mr-3 ${isSelected ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                                    {opt}.
-                                </span>
-                                {optText}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+  const handleNext = () => {
+    if (isLastQuestion) return;
 
-            <div className="flex items-center justify-between pt-6">
-                <button
-                    onClick={handlePrevious}
-                    disabled={getCurrentOverallIndex() === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                    <ChevronLeft size={18} /> Previous
-                </button>
+    if (groupedMode) {
+      const subject = groupedQuestions[currentSubjectIndex];
+      if (currentQuestionIndex < subject.questions.length - 1) {
+        setCurrentQuestionIndex((value) => value + 1);
+      } else {
+        goToSubject(currentSubjectIndex + 1);
+      }
+      return;
+    }
 
-                {isLastQuestion() ? (
-                    <button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                        className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50"
-                    >
-                        {submitting ? 'Submitting...' : 'Submit Exam'}
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleNext}
-                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all"
-                    >
-                        Next <ChevronRight size={18} />
-                    </button>
-                )}
-            </div>
+    setCurrentQuestionIndex((value) => value + 1);
+  };
 
-            <div className="flex justify-center gap-1.5 flex-wrap">
-                {(groupedQuestions ? shuffledQuestions : shuffledQuestions).map((q, idx) => {
-                    const isAnswered = !!answers[q.id];
-                    const isCurrent = idx === getCurrentOverallIndex();
-                    return (
-                        <button
-                            key={q.id}
-                            onClick={() => {
-                                const totalQuestions = getTotalQuestions();
-                                if (idx < 0 || idx >= totalQuestions) return;
+  const handlePrevious = () => {
+    if (currentOverallIndex === 0) return;
 
-                                if (groupedQuestions) {
-                                    let subjIdx = 0;
-                                    let qIdx = idx;
-                                    for (let i = 0; i < groupedQuestions.length; i++) {
-                                        if (qIdx < groupedQuestions[i].questions.length) {
-                                            subjIdx = i;
-                                            break;
-                                        }
-                                        qIdx -= groupedQuestions[i].questions.length;
-                                    }
-                                    setCurrentSubjectIndex(subjIdx);
-                                    setCurrentQuestionIndex(qIdx);
-                                } else {
-                                    setCurrentQuestionIndex(idx);
-                                }
-                            }}
-                            className={`w-7 h-7 rounded text-xs font-bold transition-colors ${
-                                isCurrent
-                                    ? 'bg-blue-600 text-white'
-                                    : isAnswered
-                                        ? 'bg-emerald-500/30 text-emerald-400 border border-emerald-500/30'
-                                        : 'bg-secondary/50 text-muted-foreground'
-                            }`}
-                        >
-                            {idx + 1}
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
+    if (groupedMode) {
+      if (currentQuestionIndex > 0) {
+        setCurrentQuestionIndex((value) => value - 1);
+      } else {
+        const previousSubject = groupedQuestions[currentSubjectIndex - 1];
+        if (previousSubject) {
+          setCurrentSubjectIndex((value) => value - 1);
+          setCurrentQuestionIndex(previousSubject.questions.length - 1);
+          if (exam.time_mode === 'per_subject') {
+            setTimeLeft(previousSubject.timeLimitMinutes * 60);
+          }
+        }
+      }
+      return;
+    }
+
+    setCurrentQuestionIndex((value) => value - 1);
+  };
+
+  const goToQuestion = (targetIndex: number) => {
+    if (targetIndex < 0 || targetIndex >= totalQuestions) return;
+
+    if (!groupedMode) {
+      setCurrentQuestionIndex(targetIndex);
+      return;
+    }
+
+    let remaining = targetIndex;
+    for (let subjectIndex = 0; subjectIndex < groupedQuestions.length; subjectIndex++) {
+      const subject = groupedQuestions[subjectIndex];
+      if (remaining < subject.questions.length) {
+        setCurrentSubjectIndex(subjectIndex);
+        setCurrentQuestionIndex(remaining);
+        return;
+      }
+      remaining -= subject.questions.length;
+    }
+  };
+
+  if (submittedResult) {
+    return <ExamResults result={submittedResult} exam={{ id: exam.id, title: exam.title }} />;
+  }
+
+  if (!currentQuestion) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center p-6 text-center">
+        <Card className="max-w-md rounded-lg p-8">
+          <h1 className="text-2xl font-semibold">No questions available</h1>
+          <p className="mt-3 text-muted-foreground">This exam does not have any published questions yet.</p>
+        </Card>
+      </div>
     );
+  }
+
+  const answeredCount = Object.keys(answers).length;
+  const completion = percentage(answeredCount, totalQuestions);
+  const currentSubject = groupedMode ? groupedQuestions[currentSubjectIndex] : null;
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <Card className="sticky top-4 z-20 rounded-lg p-5 shadow-sm">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <StatusBadge variant="purple">Mock exam</StatusBadge>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">{exam.title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {currentSubject ? `${currentSubject.subjectTitle} - ` : ''}
+              Question {currentOverallIndex + 1} of {totalQuestions}
+            </p>
+          </div>
+          <div className={cn(
+            'inline-flex items-center gap-2 rounded-lg border px-4 py-3 font-mono text-xl font-semibold',
+            timeLeft < 60 ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'bg-secondary text-foreground',
+          )}>
+            <Clock size={20} />
+            {formatTime(timeLeft)}
+          </div>
+        </div>
+        <ProgressBar value={completion} className="mt-5" />
+      </Card>
+
+      {groupedMode && (
+        <div className="flex flex-wrap gap-2">
+          {groupedQuestions.map((subject, index) => (
+            <button
+              key={subject.subjectId}
+              type="button"
+              onClick={() => goToSubject(index)}
+              className={cn(
+                'rounded-lg border px-3 py-2 text-xs font-semibold transition',
+                index === currentSubjectIndex ? 'border-primary bg-primary text-primary-foreground' : 'bg-card hover:border-primary/40',
+              )}
+            >
+              {subject.subjectTitle}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Card className="rounded-lg p-6 shadow-sm">
+        <div className="flex gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+            {currentOverallIndex + 1}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold leading-7">{currentQuestion.question_text}</h2>
+            <div className="mt-5 grid gap-3">
+              {options.map((option) => {
+                const selected = answers[currentQuestion.id] === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => handleSelect(currentQuestion.id, option)}
+                    className={cn(
+                      'flex w-full items-start gap-3 rounded-lg border p-4 text-left transition',
+                      selected ? 'border-primary bg-primary/10 text-primary' : 'bg-background hover:border-primary/40',
+                    )}
+                  >
+                    {selected ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" /> : <Circle size={18} className="mt-0.5 shrink-0 text-muted-foreground" />}
+                    <span>
+                      <span className="font-semibold">{option}.</span> {optionText(currentQuestion, option)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="secondary" onClick={handlePrevious} disabled={currentOverallIndex === 0}>
+          <ChevronLeft size={18} className="mr-2" />
+          Previous
+        </Button>
+        {isLastQuestion ? (
+          <Button onClick={submitExam} disabled={submitting} size="lg">
+            <Send size={18} className="mr-2" />
+            {submitting ? 'Submitting...' : 'Submit exam'}
+          </Button>
+        ) : (
+          <Button onClick={handleNext} size="lg">
+            Next
+            <ChevronRight size={18} className="ml-2" />
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-2">
+        {orderedQuestions.map((question, index) => {
+          const current = index === currentOverallIndex;
+          const answered = Boolean(answers[question.id]);
+          return (
+            <button
+              key={question.id}
+              type="button"
+              onClick={() => goToQuestion(index)}
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-md border text-xs font-semibold transition',
+                current
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : answered
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                    : 'bg-card text-muted-foreground hover:border-primary/40',
+              )}
+            >
+              {index + 1}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
-@theme {
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
 
@@ -36,48 +39,48 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 210 35% 98%;
+    --foreground: 218 31% 13%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 218 31% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 221.2 83.2% 53.3%;
+    --popover-foreground: 218 31% 13%;
+    --primary: 196 78% 33%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 202 32% 93%;
+    --secondary-foreground: 217 31% 17%;
+    --muted: 207 24% 91%;
+    --muted-foreground: 215 14% 45%;
+    --accent: 160 38% 90%;
+    --accent-foreground: 166 52% 22%;
+    --destructive: 350 72% 44%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 24% 86%;
+    --input: 210 24% 86%;
+    --ring: 196 78% 33%;
     --radius: 0.5rem;
   }
  
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 224.3 76.3% 48%;
+    --background: 218 35% 8%;
+    --foreground: 210 35% 97%;
+    --card: 219 30% 11%;
+    --card-foreground: 210 35% 97%;
+    --popover: 219 30% 11%;
+    --popover-foreground: 210 35% 97%;
+    --primary: 191 76% 46%;
+    --primary-foreground: 218 35% 8%;
+    --secondary: 217 28% 16%;
+    --secondary-foreground: 210 35% 97%;
+    --muted: 217 22% 18%;
+    --muted-foreground: 215 18% 70%;
+    --accent: 165 39% 18%;
+    --accent-foreground: 156 62% 82%;
+    --destructive: 350 71% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 23% 21%;
+    --input: 217 23% 21%;
+    --ring: 191 76% 46%;
   }
 }
 
@@ -86,16 +89,25 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    letter-spacing: 0;
+  }
+
+  a,
+  button,
+  input,
+  textarea,
+  select {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
   
   /* Retaining original glassmorphism classes as aliases temporarily to prevent breakage */
   .glass {
-    @apply bg-background/60 backdrop-blur-lg border border-border;
+    @apply bg-card/80 backdrop-blur-lg border border-border shadow-sm;
   }
   
 .glass-card {
-  @apply bg-card/80 backdrop-blur-xl border border-border rounded-xl shadow-lg;
+  @apply bg-card/90 backdrop-blur-xl border border-border rounded-lg shadow-sm;
 }
 
 #yt-player-host iframe {

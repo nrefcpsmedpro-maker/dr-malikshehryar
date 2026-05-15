@@ -33,13 +33,14 @@ async function getAdminSupabaseClient() {
 export async function createCourseAction(formData: FormData) {
   const title = formData.get('title') as string;
   const description = formData.get('description') as string;
+  const thumbnail_url = formData.get('thumbnail_url') as string;
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
   const { data, error } = await supabase
     .from('courses')
-    .insert([{ title, description }])
+    .insert([{ title, description, thumbnail_url: thumbnail_url || null }])
     .select()
     .single();
 
@@ -57,13 +58,14 @@ export async function updateCourseAction(formData: FormData) {
   const courseId = formData.get('courseId') as string;
   const title = formData.get('title') as string;
   const description = formData.get('description') as string;
+  const thumbnail_url = formData.get('thumbnail_url') as string;
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
   await supabase
     .from('courses')
-    .update({ title, description })
+    .update({ title, description, thumbnail_url: thumbnail_url || null })
     .eq('id', courseId);
 
   revalidatePath('/admin/courses');
