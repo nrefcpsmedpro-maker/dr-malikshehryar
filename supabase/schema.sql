@@ -7,11 +7,15 @@ create table profiles (
   email text unique not null,
   full_name text,
   mobile_number text,
-  cnic_number text,
+  cnic_number text check (cnic_number is null or cnic_number ~ '^[0-9]{13}$'),
   role user_role default 'student',
   is_approved boolean default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+create unique index profiles_cnic_number_unique
+  on profiles (cnic_number)
+  where cnic_number is not null and cnic_number <> '';
 
 -- Set up Row Level Security (RLS)
 alter table profiles enable row level security;
@@ -41,7 +45,7 @@ begin
     'student',
     new.raw_user_meta_data->>'full_name',
     new.raw_user_meta_data->>'mobile_number',
-    new.raw_user_meta_data->>'cnic_number',
+    nullif(regexp_replace(coalesce(new.raw_user_meta_data->>'cnic_number', ''), '\D', '', 'g'), ''),
     false
   );
   return new;

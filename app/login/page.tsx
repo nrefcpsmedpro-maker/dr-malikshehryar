@@ -11,6 +11,10 @@ import { Card } from '@/components/ui/card';
 type AuthMode = 'login' | 'signup';
 type AuthFailure = { message: string } | null;
 
+function normalizeCnic(value: string) {
+  return value.replace(/\D/g, '');
+}
+
 function GoogleIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
@@ -59,8 +63,16 @@ export default function LoginPage() {
     };
 
     if (mode === 'signup') {
+      const normalizedCnic = normalizeCnic(cnicNumber);
+
       if (password !== confirmPassword) {
         setError('Passwords do not match.');
+        setLoading(false);
+        return;
+      }
+
+      if (normalizedCnic.length !== 13) {
+        setError('CNIC must contain exactly 13 digits.');
         setLoading(false);
         return;
       }
@@ -85,7 +97,7 @@ export default function LoginPage() {
           data: {
             full_name: fullName,
             mobile_number: mobileNumber,
-            cnic_number: cnicNumber,
+            cnic_number: normalizedCnic,
           },
         },
       });
