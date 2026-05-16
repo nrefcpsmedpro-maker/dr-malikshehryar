@@ -35,6 +35,8 @@ const classroomImage =
   "https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=85";
 const examPracticeImage =
   "https://images.unsplash.com/photo-1581056771107-24ca5f033842?auto=format&fit=crop&w=1200&q=85";
+const academyWhatsAppNumber = "+92 345 5240705";
+const academyWhatsAppHref = "https://wa.me/923455240705";
 
 const navLinks = [
   ["Packages", "#packages"],
@@ -223,10 +225,15 @@ export default async function HomePage({
         <div className="border-b bg-slate-950 text-white">
           <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-2 text-xs font-medium sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-white/80">
-              <span className="inline-flex items-center gap-2">
+              <a
+                href={academyWhatsAppHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 hover:text-white"
+              >
                 <Phone size={14} className="text-emerald-300" />
-                +92 300 0000000
-              </span>
+                {academyWhatsAppNumber}
+              </a>
               <span className="inline-flex items-center gap-2">
                 <Mail size={14} className="text-amber-300" />
                 admissions@medpro.example
@@ -307,9 +314,9 @@ export default async function HomePage({
             </div>
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               {[
-                ["Approved access", ShieldCheck],
-                ["Protected videos", Video],
-                ["Timed exams", Clock3],
+                ["NRE mentor", ShieldCheck],
+                ["FCPS 1 mentor", Video],
+                ["JCAT & OET mentor", Clock3],
               ].map(([label, Icon]) => (
                 <div key={label as string} className="flex items-center gap-3 rounded-lg border bg-white p-3 shadow-sm">
                   <Icon size={18} className="text-primary" />
@@ -338,13 +345,18 @@ export default async function HomePage({
                     Share your target exam and the academy team can guide you toward the right course access.
                   </p>
                 </div>
-                <div className="flex items-center gap-3 rounded-lg bg-emerald-50 p-4 text-emerald-800">
+                <a
+                  href={academyWhatsAppHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 rounded-lg bg-emerald-50 p-4 text-emerald-800 transition hover:bg-emerald-100"
+                >
                   <MessageCircle size={22} />
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.14em]">WhatsApp guidance</p>
-                    <p className="font-bold">+92 300 0000000</p>
+                    <p className="font-bold">{academyWhatsAppNumber}</p>
                   </div>
-                </div>
+                </a>
               </div>
             </div>
           </div>
@@ -381,27 +393,32 @@ export default async function HomePage({
                   sizes="(min-width: 1024px) 40vw, 100vw"
                   className="bg-white object-contain object-center"
                 />
-              </div>
+            </div>
             <div className="absolute bottom-5 left-5 right-5 rounded-lg border bg-white/94 p-5 shadow-lg backdrop-blur">
               <p className="text-sm font-bold text-primary">Dr. Malik Shehryar</p>
-              <p className="mt-1 text-sm text-muted-foreground">Medical educator and academy lead</p>
+              <p className="mt-1 text-sm text-muted-foreground">NRE, FCPS 1, JCAT, and OET mentor</p>
             </div>
           </div>
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">About the academy</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 md:text-5xl">
-              Medical lectures made organized, accessible, and exam focused.
+              Mentorship built on clinical practice, teaching experience, and exam insight.
             </h2>
             <p className="mt-5 text-lg leading-8 text-muted-foreground">
-              Students get a clearer pathway from discovery to registration, demo lectures, course
-              packages, mock exams, and protected LMS access.
+              Dr. Malik Shehryar is an NRE Mentor, FCPS 1 Mentor, JCAT Mentor, and OET Mentor with
+              over 10 years of teaching and clinical experience. He is a graduate of RMU Rawalpindi
+              and works in a government hospital as SR Medicine.
+            </p>
+            <p className="mt-4 text-lg leading-8 text-muted-foreground">
+              He has also served as ex-President YDA HFH and VP Resident Research Forum, bringing
+              practical hospital experience and structured exam guidance into the academy.
             </p>
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {[
-                "Complete learning pathways instead of scattered files",
-                "Admin approval keeps academy content controlled",
-                "Progress and certificates make outcomes visible",
-                "Exam engines support timed medical MCQ practice",
+                "NRE, FCPS 1, JCAT, and OET exam mentorship",
+                "Over 10 years of teaching and clinical experience",
+                "Graduate of RMU Rawalpindi",
+                "Government hospital SR Medicine experience",
               ].map((item) => (
                 <div key={item} className="flex gap-3 rounded-lg border bg-card p-4">
                   <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-600" />
@@ -712,12 +729,17 @@ export default async function HomePage({
             <div className="mt-4 space-y-3 text-sm text-white/70">
               <p className="flex items-center gap-2">
                 <MapPin size={15} className="text-emerald-300" />
-                Lahore, Pakistan
+                Rawalpindi, Pakistan
               </p>
-              <p className="flex items-center gap-2">
+              <a
+                href={academyWhatsAppHref}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 hover:text-white"
+              >
                 <Phone size={15} className="text-emerald-300" />
-                +92 300 0000000
-              </p>
+                {academyWhatsAppNumber}
+              </a>
               <p className="flex items-center gap-2">
                 <Sparkles size={15} className="text-amber-300" />
                 Exam-focused medical academy
