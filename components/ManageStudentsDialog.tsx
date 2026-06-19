@@ -136,23 +136,25 @@ export function ManageStudentsDialog({ courseId, courseTitle }: { courseId: stri
                        {data?.course?.enrollments?.map((enrollment) => {
                           const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
                           return (
-                          <div key={enrollment.id} className="p-3 bg-secondary/30 rounded-md border border-border flex items-center justify-between">
-                             <div>
-                                <p className="text-sm font-medium">{profile?.full_name || profile?.email}</p>
-                                {profile?.full_name && (
-                                  <p className="text-xs text-muted-foreground">{profile.email}</p>
-                                )}
-                             </div>
-                             <div className="flex items-center gap-2">
-                               <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-                                  Enrolled {new Date(enrollment.created_at).toLocaleDateString()}
-                               </span>
-                               <form action={handleUnenroll}>
-                                 <input type="hidden" name="enrollmentId" value={enrollment.id} />
-                                 <UnenrollButton />
-                               </form>
-                             </div>
-                          </div>
+                           <div key={enrollment.id} className="p-3 bg-secondary/30 rounded-md border border-border">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                 <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{profile?.full_name || profile?.email}</p>
+                                    {profile?.full_name && (
+                                      <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
+                                    )}
+                                 </div>
+                                 <div className="flex items-center gap-2 shrink-0">
+                                   <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
+                                      Enrolled {new Date(enrollment.created_at).toLocaleDateString()}
+                                   </span>
+                                   <form action={handleUnenroll}>
+                                     <input type="hidden" name="enrollmentId" value={enrollment.id} />
+                                     <UnenrollButton />
+                                   </form>
+                                 </div>
+                              </div>
+                           </div>
                           );
                        })}
                       {data?.course?.enrollments?.length === 0 && (

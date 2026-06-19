@@ -116,6 +116,13 @@ type ProgressContext = {
   lessonId: string;
 };
 
+type WatermarkData = {
+  name: string;
+  email: string;
+  cnic: string | null;
+  phone: string | null;
+};
+
 type PictureInPictureElement = HTMLIFrameElement & {
   requestPictureInPicture?: () => Promise<void>;
 };
@@ -123,9 +130,11 @@ type PictureInPictureElement = HTMLIFrameElement & {
 export default function VideoPlayer({
   playbackToken,
   progressContext,
+  watermark,
 }: {
   playbackToken: string;
   progressContext?: ProgressContext;
+  watermark?: WatermarkData;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -764,6 +773,33 @@ export default function VideoPlayer({
           position: absolute;
           inset: 0;
         }
+        @keyframes watermark-float {
+          0%    { top: 5%;   left: 5%;   }
+          14%   { top: 5%;   left: 80%;  }
+          28%   { top: 75%;  left: 80%;  }
+          42%   { top: 75%;  left: 5%;   }
+          57%   { top: 5%;   left: 40%;  }
+          71%   { top: 75%;  left: 40%;  }
+          85%   { top: 40%;  left: 5%;   }
+          100%  { top: 5%;   left: 5%;   }
+        }
+        .watermark-overlay {
+          position: absolute;
+          z-index: 20;
+          pointer-events: none;
+          user-select: none;
+          animation: watermark-float 30s ease-in-out infinite;
+          opacity: 1;
+          transform: rotate(-5deg);
+          color: #dc2626;
+          font-size: 10px;
+          line-height: 1.3;
+        }
+        @media (min-width: 640px) {
+          .watermark-overlay {
+            font-size: 12px;
+          }
+        }
       `}</style>
       <div
         className={cn(
@@ -795,6 +831,19 @@ export default function VideoPlayer({
           }}
           data-nocontextmenu="true"
         />
+
+        {watermark && (
+          <div className="watermark-overlay">
+            <p className="text-xs font-medium drop-shadow-sm">{watermark.name}</p>
+            <p className="text-xs drop-shadow-sm">{watermark.email}</p>
+            {watermark.cnic && (
+              <p className="text-xs drop-shadow-sm">CNIC: {watermark.cnic}</p>
+            )}
+            {watermark.phone && (
+              <p className="text-xs drop-shadow-sm">{watermark.phone}</p>
+            )}
+          </div>
+        )}
 
         {!ready && !errorMessage && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">

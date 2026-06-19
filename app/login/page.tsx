@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GraduationCap } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
@@ -209,7 +210,14 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="password">Password</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium" htmlFor="password">Password</label>
+              {mode === 'login' && (
+                <Link href="/forgot-password" className="text-xs font-medium text-primary hover:text-primary/80">
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <Input
               id="password"
               type="password"
@@ -250,7 +258,7 @@ export default function LoginPage() {
           variant="outline"
           disabled={loading}
           onClick={handleGoogleSignIn}
-          className="h-11 w-full bg-white text-slate-800 hover:bg-slate-50 dark:bg-white dark:text-slate-800 dark:hover:bg-slate-50"
+          className="h-11 w-full bg-white text-slate-800 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
         >
           <GoogleIcon />
           <span className="ml-3">{mode === 'login' ? 'Sign in with Google' : 'Sign up with Google'}</span>

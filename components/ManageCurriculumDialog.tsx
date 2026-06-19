@@ -235,13 +235,17 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
                                         return (
                                         <div key={lesson.id} className={`p-2 rounded group hover:bg-background/80 transition-colors border ${lesson.is_locked ? 'border-amber-500/20 bg-amber-500/5' : 'border-transparent hover:border-border/50'}`}>
                                            {isEditingThisLesson ? (
-                                              <form action={handleUpdateLesson} className="flex gap-2 items-center w-full">
-                                                  <input type="hidden" name="lessonId" value={lesson.id} />
-                                                  <Input type="text" name="title" defaultValue={lesson.title} required className="h-8 text-xs flex-1" />
-                                                  <Input type="text" name="youtube_id" defaultValue={lesson.youtube_id} required className="h-8 text-xs w-32" />
-                                                  <Button type="submit" size="sm" className="h-8 text-xs shrink-0">Save</Button>
-                                                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs shrink-0" onClick={() => setEditingLesson(null)}>Cancel</Button>
-                                              </form>
+                                               <form action={handleUpdateLesson} className="flex flex-col gap-2 w-full">
+                                                   <input type="hidden" name="lessonId" value={lesson.id} />
+                                                   <div className="flex flex-col sm:flex-row gap-2">
+                                                     <Input type="text" name="title" defaultValue={lesson.title} required className="h-8 text-xs flex-1" />
+                                                     <Input type="text" name="youtube_id" defaultValue={lesson.youtube_id} required className="h-8 text-xs sm:w-32" />
+                                                   </div>
+                                                   <div className="flex gap-2">
+                                                     <Button type="submit" size="sm" className="h-8 text-xs shrink-0">Save</Button>
+                                                     <Button type="button" variant="ghost" size="sm" className="h-8 text-xs shrink-0" onClick={() => setEditingLesson(null)}>Cancel</Button>
+                                                   </div>
+                                               </form>
                                            ) : (
                                               <div className="flex items-center justify-between w-full">
                                                  <div className="flex items-center gap-3 overflow-hidden">
@@ -295,13 +299,15 @@ export function ManageCurriculumDialog({ courseId, courseTitle }: { courseId: st
                                         </div>
                                      )})}
       
-                                     <form id={`form-add-lesson-${subject.id}`} action={handleAddLesson} className="flex gap-2 pt-3 mt-1 items-center border-t border-border/30">
-                                        <input type="hidden" name="subject_id" value={subject.id} />
-                                        <Input type="text" name="title" required className="h-8 text-xs flex-1 border-primary/20 shadow-sm" placeholder="Lesson Name..." />
-                                        <Input type="text" name="youtube_id" required className="h-8 text-xs w-32 shadow-sm" placeholder="YouTube URL..." />
-                                        <Button type="submit" variant="secondary" size="sm" className="h-8 text-xs shrink-0 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm">
-                                           + Add Lesson
-                                        </Button>
+                                     <form id={`form-add-lesson-${subject.id}`} action={handleAddLesson} className="flex flex-col gap-2 pt-3 mt-1 items-stretch sm:items-center border-t border-border/30">
+                                         <input type="hidden" name="subject_id" value={subject.id} />
+                                         <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                                           <Input type="text" name="title" required className="h-8 text-xs flex-1 border-primary/20 shadow-sm" placeholder="Lesson Name..." />
+                                           <Input type="text" name="youtube_id" required className="h-8 text-xs sm:w-32 shadow-sm" placeholder="YouTube URL..." />
+                                         </div>
+                                         <Button type="submit" variant="secondary" size="sm" className="h-8 text-xs shrink-0 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm">
+                                            + Add Lesson
+                                         </Button>
                                      </form>
                                   </div>
                                </div>

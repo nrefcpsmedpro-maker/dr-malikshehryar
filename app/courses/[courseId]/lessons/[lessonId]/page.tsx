@@ -38,7 +38,7 @@ export default async function LessonPage({
 
   const [{ data: profile }, { data: lessonData, error: lessonError }, { data: subjectsData }, { data: progressData }] =
     await Promise.all([
-      supabase.from('profiles').select('role').eq('id', user.id).single(),
+      supabase.from('profiles').select('role, full_name, email, cnic_number, mobile_number').eq('id', user.id).single(),
       supabase
         .from('lessons')
         .select('id, title, youtube_id, is_locked, courses(title), subjects(title, is_locked)')
@@ -117,7 +117,16 @@ export default async function LessonPage({
             <h1 className="mt-2 text-3xl font-semibold tracking-tight lg:text-4xl">{lesson.title}</h1>
           </div>
 
-          <VideoPlayer playbackToken={playbackToken} progressContext={{ courseId, lessonId }} />
+          <VideoPlayer
+            playbackToken={playbackToken}
+            progressContext={{ courseId, lessonId }}
+            watermark={{
+              name: (profile as { full_name?: string | null })?.full_name || user.email || '',
+              email: user.email || '',
+              cnic: (profile as { cnic_number?: string | null })?.cnic_number || null,
+              phone: (profile as { mobile_number?: string | null })?.mobile_number || null,
+            }}
+          />
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <LessonNavLink label="Previous lesson" courseId={courseId} lesson={previousLesson} />

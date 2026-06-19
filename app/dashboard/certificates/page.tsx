@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { Award, CheckCircle2, LockKeyhole, Medal } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
+import { CertificateDownload } from '@/components/CertificateDownload';
 import { EmptyState } from '@/components/lms/EmptyState';
 import { PageHeader } from '@/components/lms/PageHeader';
 import { ProgressBar } from '@/components/lms/ProgressBar';
@@ -62,7 +63,8 @@ export default async function CertificatesPage() {
 
   if (!user) redirect('/login');
 
-  const [{ data: enrollmentsData }, { data: progressData }, { data: certificatesData }] = await Promise.all([
+  const [{ data: profileData }, { data: enrollmentsData }, { data: progressData }, { data: certificatesData }] = await Promise.all([
+    supabase.from('profiles').select('full_name, email').eq('id', user.id).single(),
     supabase
       .from('enrollments')
       .select('id, user_id, course_id, created_at, courses(id, title, description, thumbnail_url, created_at, lessons(count))')
@@ -76,6 +78,8 @@ export default async function CertificatesPage() {
       .order('issued_at', { ascending: false }),
   ]);
 
+  const profile = profileData as { full_name: string | null; email: string } | null;
+  const studentName = profile?.full_name || profile?.email || 'Student';
   const enrollments = (enrollmentsData ?? []) as unknown as EnrollmentWithCourse[];
   const progress = (progressData ?? []) as LessonProgress[];
   const certificates = (certificatesData ?? []) as unknown as Certificate[];
@@ -101,9 +105,17 @@ export default async function CertificatesPage() {
               <div className="p-6">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Certificate code</p>
                 <p className="mt-2 font-mono text-sm font-semibold">{certificate.certificate_code}</p>
-                <StatusBadge variant="success" className="mt-5">
-                  Verified completion
-                </StatusBadge>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <StatusBadge variant="success">
+                    Verified completion
+                  </StatusBadge>
+                  <CertificateDownload
+                    studentName={studentName}
+                    courseName={certificate.courses?.title ?? 'Course'}
+                    certificateCode={certificate.certificate_code}
+                    issuedAt={certificate.issued_at}
+                  />
+                </div>
               </div>
             </Card>
           ))}

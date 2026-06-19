@@ -57,15 +57,15 @@ export default async function AdminAnalyticsPage() {
           <StatusBadge variant="info">{leads.length} shown</StatusBadge>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-lg border">
-          <div className="grid grid-cols-[1fr_1fr_1fr] bg-secondary px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="mt-6 overflow-x-auto rounded-lg border">
+          <div className="grid min-w-[480px] grid-cols-[1fr_1fr_1fr] bg-secondary px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
             <span>Name</span>
             <span>Interest</span>
             <span>Submitted</span>
           </div>
           {leads.length ? (
             leads.map((lead) => (
-              <div key={lead.id} className="grid grid-cols-[1fr_1fr_1fr] gap-4 border-t bg-background px-4 py-4 text-sm">
+              <div key={lead.id} className="grid min-w-[480px] grid-cols-[1fr_1fr_1fr] gap-4 border-t bg-background px-4 py-4 text-sm">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{lead.name}</p>
                   <p className="truncate text-xs text-muted-foreground">{lead.email}</p>

@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import AppShell from '@/components/lms/AppShell';
+import ProfileCompletionGuard from '@/components/ProfileCompletionGuard';
 import { redirect } from 'next/navigation';
 
 import { cookies } from 'next/headers';
@@ -26,7 +27,9 @@ export default async function DashboardLayout({
   // We don't strictly reject admins here; they might want to view the student perspective.
   return (
     <AppShell role="student" userLabel={profile?.full_name || profile?.email}>
-      {children}
+      <ProfileCompletionGuard>
+        {children}
+      </ProfileCompletionGuard>
     </AppShell>
   );
 }

@@ -76,19 +76,19 @@ export default function ExamResults({ result, exam }: ExamResultsProps) {
                     </div>
                 </div>
 
-                <div className="flex justify-center gap-8 mb-8 text-sm font-medium">
+                <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mb-8 text-sm font-medium">
                     <div className="flex flex-col">
                         <span className="text-muted-foreground uppercase text-xs tracking-wider">Score</span>
                         <span className="text-lg">{result.total_score} / {result.total_questions}</span>
                     </div>
-                    <div className="w-px bg-white/10" />
+                    <div className="hidden sm:block w-px bg-white/10" />
                     <div className="flex flex-col">
                         <span className="text-muted-foreground uppercase text-xs tracking-wider">Status</span>
                         <span className={`text-lg ${isPassing ? 'text-emerald-400' : 'text-destructive'}`}>
                             {isPassing ? 'PASSED' : 'FAILED'}
                         </span>
                     </div>
-                    <div className="w-px bg-white/10" />
+                    <div className="hidden sm:block w-px bg-white/10" />
                     <div className="flex flex-col">
                         <span className="text-muted-foreground uppercase text-xs tracking-wider">Questions</span>
                         <span className="text-lg">{result.total_questions}</span>
